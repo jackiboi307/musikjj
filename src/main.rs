@@ -17,8 +17,9 @@ fn main() -> anyhow::Result<()> {
     println!("Playing...");
     stream.play()?;
 
+    println!("Enter notes (example: '0 4 7 4' for a major arp)");
     loop {
-        let notes = read_line("Enter notes > ")?;
+        let notes = read_line(">>> ")?;
         let notes: Vec<f32> = notes
             .split_ascii_whitespace()
             .map(|note| midi_to_freq(ROOT + note.trim().parse::<u8>().unwrap()))
