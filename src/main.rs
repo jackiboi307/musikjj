@@ -5,7 +5,7 @@ use cpal::{
 };
 
 use std::io::{self, Write};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use std::f32::consts::TAU;
 
 fn main() -> anyhow::Result<()> {
@@ -190,6 +190,7 @@ fn make_stream<T>(
     let length = sequence.len();
     let mut step = 0;
     let mut last_step_time = SystemTime::UNIX_EPOCH;
+    let step_duration = Duration::from_millis(100);
 
     let stream = device.build_output_stream(
         config,
@@ -197,13 +198,17 @@ fn make_stream<T>(
             let now = SystemTime::now();
             let elapsed = now
                 .duration_since(last_step_time)
-                .unwrap()
-                .as_millis();
+                .unwrap();
 
-            if elapsed >= 200 {
+            if elapsed >= step_duration {
                 oscillator.set_freqs(&create_power_chord(sequence[step]));
                 step = (step + 1) % length;
-                last_step_time = now;
+
+                let lag = elapsed - step_duration;
+                let lag = if lag < step_duration {
+                    lag } else { Duration::ZERO };
+
+                last_step_time = now - lag;
             }
 
             process_frame(output, &mut oscillator, num_channels)
