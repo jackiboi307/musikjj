@@ -5,15 +5,56 @@ use cpal::{
 };
 
 use std::io::{self, Write};
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, Duration};
 use std::f32::consts::TAU;
 
 fn main() -> anyhow::Result<()> {
-    let stream = stream_setup_for()?;
+    let root = 45;
+
+    let mut app = Arc::new(RwLock::new(App {
+        sequence: vec![
+            midi_to_freq(root),
+            midi_to_freq(root + 4),
+            midi_to_freq(root + 7),
+            midi_to_freq(root + 9),
+            midi_to_freq(root + 6),
+            midi_to_freq(root + 1),
+            midi_to_freq(root + 8),
+            midi_to_freq(root + 2),
+        ],
+    }));
+
+    let stream = stream_setup_for(Arc::clone(&app))?;
     println!("Playing...");
     stream.play()?;
-    loop {}
+
+    loop {
+        let notes = read_line("Enter notes > ")?;
+        let notes: Vec<f32> = notes
+            .split_ascii_whitespace()
+            .map(|note| midi_to_freq(root + note.trim().parse::<u8>().unwrap()))
+            .collect();
+        let mut app = app.write().unwrap();
+        app.sequence = notes;
+    }
 }
+
+fn read_line(prompt: &str) -> io::Result<String> {
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    print!("{prompt}");
+    let _ = io::stdout().flush();
+    stdin.read_line(&mut buffer)?;
+    Ok(buffer)
+}
+
+struct App {
+    sequence: Vec<f32>,
+}
+
+unsafe impl Send for App {}
+unsafe impl Sync for App {}
 
 trait Oscillator {
     fn tick(&mut self) -> f32;
@@ -39,7 +80,7 @@ impl BasicOscillator {
         let max = self.sample_rate as usize / freq as usize;
         for i in 0..max {
             waveform.push(
-                self.calculate_sine(i as f32 / max as f32));
+                self.calculate_saw(i as f32 / max as f32));
         }
         waveform.into()
     }
@@ -106,22 +147,22 @@ impl Oscillator for PolyOscillator {
     }
 }
 
-fn stream_setup_for() -> Result<cpal::Stream, anyhow::Error> {
+fn stream_setup_for(app: Arc<RwLock<App>>) -> Result<cpal::Stream, anyhow::Error> {
     let (_host, device, config) = host_device_setup()?;
 
     match config.sample_format() {
-        cpal::SampleFormat::I8  => make_stream::<i8> (&device, &config.into()),
-        cpal::SampleFormat::I16 => make_stream::<i16>(&device, &config.into()),
-        cpal::SampleFormat::I24 => make_stream::<I24>(&device, &config.into()),
-        cpal::SampleFormat::I32 => make_stream::<i32>(&device, &config.into()),
-        cpal::SampleFormat::I64 => make_stream::<i64>(&device, &config.into()),
-        cpal::SampleFormat::U8  => make_stream::<u8> (&device, &config.into()),
-        cpal::SampleFormat::U16 => make_stream::<u16>(&device, &config.into()),
-        cpal::SampleFormat::U24 => make_stream::<U24>(&device, &config.into()),
-        cpal::SampleFormat::U32 => make_stream::<u32>(&device, &config.into()),
-        cpal::SampleFormat::U64 => make_stream::<u64>(&device, &config.into()),
-        cpal::SampleFormat::F32 => make_stream::<f32>(&device, &config.into()),
-        cpal::SampleFormat::F64 => make_stream::<f64>(&device, &config.into()),
+        cpal::SampleFormat::I8  => make_stream::<i8> (app, &device, &config.into()),
+        cpal::SampleFormat::I16 => make_stream::<i16>(app, &device, &config.into()),
+        cpal::SampleFormat::I24 => make_stream::<I24>(app, &device, &config.into()),
+        cpal::SampleFormat::I32 => make_stream::<i32>(app, &device, &config.into()),
+        cpal::SampleFormat::I64 => make_stream::<i64>(app, &device, &config.into()),
+        cpal::SampleFormat::U8  => make_stream::<u8> (app, &device, &config.into()),
+        cpal::SampleFormat::U16 => make_stream::<u16>(app, &device, &config.into()),
+        cpal::SampleFormat::U24 => make_stream::<U24>(app, &device, &config.into()),
+        cpal::SampleFormat::U32 => make_stream::<u32>(app, &device, &config.into()),
+        cpal::SampleFormat::U64 => make_stream::<u64>(app, &device, &config.into()),
+        cpal::SampleFormat::F32 => make_stream::<f32>(app, &device, &config.into()),
+        cpal::SampleFormat::F64 => make_stream::<f64>(app, &device, &config.into()),
         sample_format => Err(anyhow::Error::msg(format!(
             "Unsupported sample format '{sample_format}'"
         ))),
@@ -139,12 +180,8 @@ fn host_device_setup()
         println!("\t{i}: {}: {}", device.id()?, device.description()?);
     }
 
-    let mut buffer = String::new();
-    let stdin = io::stdin();
-    print!("Select device > ");
-    let _ = io::stdout().flush();
-    stdin.read_line(&mut buffer)?;
-    let device: cpal::Device = devices[buffer.trim_end().parse::<usize>().unwrap()].clone();
+    let input = read_line("Select device > ")?;
+    let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
 
     println!("Output device: {}", device.id()?);
 
@@ -163,6 +200,7 @@ fn midi_to_freq(note: u8) -> f32 {
 }
 
 fn make_stream<T>(
+        app: Arc<RwLock<App>>,
         device: &cpal::Device,
         config: &cpal::StreamConfig,
     ) -> Result<cpal::Stream, anyhow::Error>
@@ -172,22 +210,9 @@ fn make_stream<T>(
     let err_fn = |err| eprintln!(
         "Error building output sound stream: {err}");
 
-    let root = 57;
-    let sequence = [
-        midi_to_freq(root),
-        midi_to_freq(root + 4),
-        midi_to_freq(root + 7),
-        midi_to_freq(root + 9),
-        midi_to_freq(root + 6),
-        midi_to_freq(root + 1),
-        midi_to_freq(root + 8),
-        midi_to_freq(root + 2),
-    ];
-
     let rate = config.sample_rate as f32;
     let mut oscillator = PolyOscillator::new(rate, 3);
 
-    let length = sequence.len();
     let mut step = 0;
     let mut last_step_time = SystemTime::UNIX_EPOCH;
     let step_duration = Duration::from_millis(100);
@@ -195,13 +220,20 @@ fn make_stream<T>(
     let stream = device.build_output_stream(
         config,
         move |output: &mut [T], _: &cpal::OutputCallbackInfo| {
+            let app = app.read().unwrap();
+
             let now = SystemTime::now();
             let elapsed = now
                 .duration_since(last_step_time)
                 .unwrap();
 
             if elapsed >= step_duration {
-                oscillator.set_freqs(&create_power_chord(sequence[step]));
+                let length = app.sequence.len();
+                if length <= step {
+                    step = length - 1;
+                }
+
+                oscillator.set_freqs(&create_power_chord(app.sequence[step]));
                 step = (step + 1) % length;
 
                 let lag = elapsed - step_duration;
