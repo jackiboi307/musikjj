@@ -64,8 +64,8 @@ struct App {
 
 impl App {
     fn new() -> Self {
-        let sequence = sequence!(ROOT,
-            [0, 4, 7, 9, 6, 1, 8, 2]
+        let sequence = sequence!(
+            ROOT, [0, 4, 7, 9, 6, 1, 8, 2]
         );
 
         let mut oscillator = PolyOscillator::new();
