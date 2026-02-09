@@ -5,26 +5,14 @@ use cpal::{
 };
 
 use std::io::{self, Write};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, Duration};
 use std::f32::consts::TAU;
 
+const ROOT: u8 = 45;
+
 fn main() -> anyhow::Result<()> {
-    let root = 45;
-
-    let mut app = Arc::new(RwLock::new(App {
-        sequence: vec![
-            midi_to_freq(root),
-            midi_to_freq(root + 4),
-            midi_to_freq(root + 7),
-            midi_to_freq(root + 9),
-            midi_to_freq(root + 6),
-            midi_to_freq(root + 1),
-            midi_to_freq(root + 8),
-            midi_to_freq(root + 2),
-        ],
-    }));
-
+    let app = Arc::new(Mutex::new(App::new()));
     let stream = stream_setup_for(Arc::clone(&app))?;
     println!("Playing...");
     stream.play()?;
@@ -33,9 +21,9 @@ fn main() -> anyhow::Result<()> {
         let notes = read_line("Enter notes > ")?;
         let notes: Vec<f32> = notes
             .split_ascii_whitespace()
-            .map(|note| midi_to_freq(root + note.trim().parse::<u8>().unwrap()))
+            .map(|note| midi_to_freq(ROOT + note.trim().parse::<u8>().unwrap()))
             .collect();
-        let mut app = app.write().unwrap();
+        let mut app = app.lock().unwrap();
         app.sequence = notes;
     }
 }
@@ -49,53 +37,117 @@ fn read_line(prompt: &str) -> io::Result<String> {
     Ok(buffer)
 }
 
+trait Generator {
+    fn tick(&mut self, sample_rate: f32) -> f32;
+}
+
+trait Processor {
+    fn tick(&mut self, sample_rate: f32, value: f32) -> f32;
+    fn step(&mut self) {}
+}
+
 struct App {
     sequence: Vec<f32>,
+    step: usize,
+    generator: PolyOscillator,
+    processors: Vec<Box<dyn Processor + Send>>,
 }
 
-unsafe impl Send for App {}
-unsafe impl Sync for App {}
+impl App {
+    fn new() -> Self {
+        let sequence = vec![
+            midi_to_freq(ROOT),
+            midi_to_freq(ROOT + 4),
+            midi_to_freq(ROOT + 7),
+            midi_to_freq(ROOT + 9),
+            midi_to_freq(ROOT + 6),
+            midi_to_freq(ROOT + 1),
+            midi_to_freq(ROOT + 8),
+            midi_to_freq(ROOT + 2),
+        ];
 
-trait Oscillator {
-    fn tick(&mut self) -> f32;
+        let mut oscillator = PolyOscillator::new();
+        oscillator.set_oscillators(3);
+
+        Self {
+            sequence,
+            step: 0,
+            generator: oscillator,
+            processors: vec![Box::new(Adsr::new())],
+        }
+    }
+
+    fn step(&mut self, sample_rate: f32) {
+        let length = self.sequence.len();
+        if length <= self.step {
+            self.step = length - 1;
+        }
+
+        let notes = create_power_chord(self.sequence[self.step]);
+        self.generator.set_freqs(&notes, sample_rate);
+        self.step = (self.step + 1) % length;
+
+        for processor in self.processors.iter_mut() {
+            processor.step();
+        }
+    }
 }
 
-struct BasicOscillator {
-    sample_rate: f32,
+impl Generator for App {
+    fn tick(&mut self, sample_rate: f32) -> f32 {
+        let mut value = self.generator.tick(sample_rate);
+        for processor in self.processors.iter_mut() {
+            value = processor.tick(sample_rate, value);
+        }
+        value
+    }
+}
+
+#[allow(dead_code)]
+enum Waveshape {
+    Sine,
+    Square,
+    Saw,
+}
+
+struct Oscillator {
+    waveshape: Waveshape,
     waveform: Box<[f32]>,
     index: usize,
 }
 
-impl BasicOscillator {
-    fn new(sample_rate: f32) -> Self {
+impl Oscillator {
+    fn new() -> Self {
         Self {
-            sample_rate,
+            waveshape: Waveshape::Square,
             waveform: vec![].into(),
             index: 0,
         }
     }
 
-    fn get_waveform(&self, freq: f32) -> Box<[f32]> {
+    fn get_waveform(&self, freq: f32, sample_rate: f32) -> Box<[f32]> {
         let mut waveform = Vec::new();
-        let max = self.sample_rate as usize / freq as usize;
+        let max = sample_rate as usize / freq as usize;
         for i in 0..max {
-            waveform.push(
-                self.calculate_saw(i as f32 / max as f32));
+            let i = i as f32 / max as f32;
+            let value = match self.waveshape {
+                Waveshape::Sine => self.calculate_sine(i),
+                Waveshape::Square => self.calculate_square(i),
+                Waveshape::Saw => self.calculate_saw(i),
+            };
+
+            waveform.push(value);
         }
         waveform.into()
     }
 
-    fn set_waveform(&mut self, freq: f32) {
-        self.waveform = self.get_waveform(freq);
+    fn set_waveform(&mut self, freq: f32, sample_rate: f32) {
+        self.waveform = self.get_waveform(freq, sample_rate);
         self.index = 0;
     }
 
     fn calculate_sine(&self, index: f32) -> f32 {
         (index * TAU).sin()
-    }
-
-    fn calculate_tan(&self, index: f32) -> f32 {
-        f32::max(-1.0, f32::min(1.0, (index * TAU).tan()))
     }
 
     fn calculate_square(&self, index: f32) -> f32 {
@@ -105,49 +157,92 @@ impl BasicOscillator {
     fn calculate_saw(&self, index: f32) -> f32 {
         index
     }
+
+    // fn calculate_tan(&self, index: f32) -> f32 {
+    //     f32::max(-1.0, f32::min(1.0, (index * TAU).tan()))
+    // }
 }
 
-impl Oscillator for BasicOscillator {
-    fn tick(&mut self) -> f32 {
-        self.index = (self.index + 1) % self.waveform.len();
-        self.waveform[self.index]
+impl Generator for Oscillator {
+    fn tick(&mut self, _sample_rate: f32) -> f32 {
+        if !self.waveform.is_empty() {
+            self.index = (self.index + 1) % self.waveform.len();
+            self.waveform[self.index]
+        } else {
+            0.0
+        }
     }
 }
 
 struct PolyOscillator {
-    oscillators: Vec<BasicOscillator>,
+    oscillators: Vec<Oscillator>,
 }
 
 impl PolyOscillator {
-    fn new(rate: f32, amount: usize) -> Self {
-        let mut oscillators = Vec::new();
-        for _ in 0..amount {
-            oscillators.push(BasicOscillator::new(rate));
-        }
-
+    fn new() -> Self {
         Self {
-            oscillators,
+            oscillators: Vec::new(),
         }
     }
 
-    fn set_freqs(&mut self, freqs: &[f32]) {
+    fn set_oscillators(&mut self, amount: usize) {
+        self.oscillators.clear();
+        for _ in 0..amount {
+            self.oscillators.push(Oscillator::new());
+        }
+    }
+
+    fn set_freqs(&mut self, freqs: &[f32], sample_rate: f32) {
         for (i, oscillator) in self.oscillators.iter_mut().enumerate() {
-            oscillator.set_waveform(freqs[i])
+            if i < freqs.len() {
+                oscillator.set_waveform(freqs[i], sample_rate);
+            } else {
+                break
+            }
         }
     }
 }
 
-impl Oscillator for PolyOscillator {
-    fn tick(&mut self) -> f32 {
+impl Generator for PolyOscillator {
+    fn tick(&mut self, sample_rate: f32) -> f32 {
         let mut value = 0.0;
+        let mut active = 0;
         for osc in self.oscillators.iter_mut() {
-            value += osc.tick();
+            if !osc.waveform.is_empty() {
+                value += osc.tick(sample_rate);
+                active += 1;
+            }
         }
-        value / self.oscillators.len() as f32
+        value / active as f32
     }
 }
 
-fn stream_setup_for(app: Arc<RwLock<App>>) -> Result<cpal::Stream, anyhow::Error> {
+struct Adsr {
+    index: f32,
+    decay: f32,
+}
+
+impl Adsr {
+    fn new() -> Self {
+        Self {
+            index: 0.0,
+            decay: 0.1,
+        }
+    }
+}
+
+impl Processor for Adsr {
+    fn tick(&mut self, sample_rate: f32, value: f32) -> f32 {
+        self.index += 1.0 / self.decay / sample_rate;
+        value * f32::max(0.0, 1.0 - self.index)
+    }
+
+    fn step(&mut self) {
+        self.index = 0.0;
+    }
+}
+
+fn stream_setup_for(app: Arc<Mutex<App>>) -> Result<cpal::Stream, anyhow::Error> {
     let (_host, device, config) = host_device_setup()?;
 
     match config.sample_format() {
@@ -200,50 +295,39 @@ fn midi_to_freq(note: u8) -> f32 {
 }
 
 fn make_stream<T>(
-        app: Arc<RwLock<App>>,
+        app: Arc<Mutex<App>>,
         device: &cpal::Device,
         config: &cpal::StreamConfig,
     ) -> Result<cpal::Stream, anyhow::Error>
     where T: SizedSample + FromSample<f32> {
 
     let num_channels = config.channels as usize;
+    let sample_rate = config.sample_rate as f32;
+
     let err_fn = |err| eprintln!(
         "Error building output sound stream: {err}");
 
-    let rate = config.sample_rate as f32;
-    let mut oscillator = PolyOscillator::new(rate, 3);
-
-    let mut step = 0;
     let mut last_step_time = SystemTime::UNIX_EPOCH;
-    let step_duration = Duration::from_millis(100);
+    let step_duration = Duration::from_millis(80);
 
     let stream = device.build_output_stream(
         config,
         move |output: &mut [T], _: &cpal::OutputCallbackInfo| {
-            let app = app.read().unwrap();
+            {
+                let mut app = app.lock().unwrap();
 
-            let now = SystemTime::now();
-            let elapsed = now
-                .duration_since(last_step_time)
-                .unwrap();
+                let now = SystemTime::now();
+                let elapsed = now
+                    .duration_since(last_step_time)
+                    .unwrap();
 
-            if elapsed >= step_duration {
-                let length = app.sequence.len();
-                if length <= step {
-                    step = length - 1;
+                if elapsed >= step_duration {
+                    app.step(sample_rate);
+                    last_step_time = now;
                 }
-
-                oscillator.set_freqs(&create_power_chord(app.sequence[step]));
-                step = (step + 1) % length;
-
-                let lag = elapsed - step_duration;
-                let lag = if lag < step_duration {
-                    lag } else { Duration::ZERO };
-
-                last_step_time = now - lag;
             }
 
-            process_frame(output, &mut oscillator, num_channels)
+            process_frame(output, &app, num_channels, sample_rate)
         },
         err_fn,
         None,
@@ -254,12 +338,16 @@ fn make_stream<T>(
 
 fn process_frame<SampleType>(
         output: &mut [SampleType],
-        oscillator: &mut impl Oscillator,
+        app: &Arc<Mutex<App>>,
         num_channels: usize,
+        sample_rate: f32,
     ) where SampleType: Sample + FromSample<f32> {
 
     for frame in output.chunks_mut(num_channels) {
-        let value: SampleType = SampleType::from_sample(oscillator.tick());
+        let value: SampleType = {
+            let mut app = app.lock().unwrap();
+            SampleType::from_sample(app.tick(sample_rate))
+        };
 
         // copy the same value to all channels
         for sample in frame.iter_mut() {
