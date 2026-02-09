@@ -4,10 +4,12 @@ use cpal::{
     SizedSample, I24, U24,
 };
 
-use std::io::{self, Write};
-use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, Duration};
-use std::f32::consts::TAU;
+use std::{
+    io::{self, Write},
+    sync::{Arc, Mutex},
+    time::{SystemTime, Duration},
+    f32::consts::TAU,
+};
 
 const ROOT: u8 = 45;
 
