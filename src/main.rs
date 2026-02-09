@@ -38,6 +38,14 @@ fn read_line(prompt: &str) -> io::Result<String> {
     Ok(buffer)
 }
 
+macro_rules! sequence {
+    ($root:expr, [$($note:expr $(,)?)*]) => {
+        vec![$(
+            midi_to_freq($root + $note),
+        )*]
+    }
+}
+
 trait Generator {
     fn tick(&mut self, sample_rate: f32) -> f32;
 }
@@ -56,16 +64,9 @@ struct App {
 
 impl App {
     fn new() -> Self {
-        let sequence = vec![
-            midi_to_freq(ROOT),
-            midi_to_freq(ROOT + 4),
-            midi_to_freq(ROOT + 7),
-            midi_to_freq(ROOT + 9),
-            midi_to_freq(ROOT + 6),
-            midi_to_freq(ROOT + 1),
-            midi_to_freq(ROOT + 8),
-            midi_to_freq(ROOT + 2),
-        ];
+        let sequence = sequence!(ROOT,
+            [0, 4, 7, 9, 6, 1, 8, 2]
+        );
 
         let mut oscillator = PolyOscillator::new();
         oscillator.set_oscillators(3);
