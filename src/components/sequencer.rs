@@ -4,22 +4,22 @@ use std::time::{SystemTime, Duration};
 macro_rules! sequence {
     ($root:expr, [$($note:expr $(,)?)*]) => {
         vec![$(
-            Note::Midi($root + $note),
+            vec![Note::Midi($root + $note)].into_boxed_slice(),
         )*]
     }
 }
 
-fn create_power_chord(note: Note) -> [Note; 3] {
-    let freq = note.freq();
-    [
-        Note::Freq(freq),
-        Note::Freq(freq * 4.0 / 3.0),
-        Note::Freq(freq * 2.0),
-    ]
-}
+// fn create_power_chord(note: Note) -> [Note; 3] {
+//     let freq = note.freq();
+//     [
+//         Note::Freq(freq),
+//         Note::Freq(freq * 4.0 / 3.0),
+//         Note::Freq(freq * 2.0),
+//     ]
+// }
 
 pub struct Sequencer {
-    pub sequence: Vec<Note>,
+    pub sequence: Vec<Box<[Note]>>,
     step: usize,
     next_step: SystemTime,
     step_duration: Duration,
@@ -40,8 +40,8 @@ impl Sequencer {
     }
 }
 
-impl NoteGenerator for Sequencer {
-    fn note_tick(&mut self) -> Option<Box<[Note]>> {
+impl Module for Sequencer {
+    fn tick(&mut self) -> Data {
         let now = SystemTime::now();
 
         if self.next_step <= now {
@@ -50,15 +50,21 @@ impl NoteGenerator for Sequencer {
                 self.step = 0;
             }
 
-            let notes = create_power_chord(self.sequence[self.step]);
+            let notes = &self.sequence[self.step];
 
             self.step = (self.step + 1) % length;
             self.next_step = now + self.step_duration;
 
-            Some(Box::new(notes))
+            Data::Notes(notes.clone())
 
         } else {
-            None
+            Data::Notes(Box::new([]))
         }
     }
+
+    fn get_output_type(&self) -> DataType { DataType::Notes }
+    fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![] }
+    fn send(&mut self, _input: usize, _data: Data) { unimplemented!() }
+
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
 }

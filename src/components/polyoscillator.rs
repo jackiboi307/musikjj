@@ -18,10 +18,10 @@ impl PolyOscillator {
         }
     }
 
-    pub fn set_freqs(&mut self, freqs: &[f32], sample_rate: f32) {
+    pub fn set_freqs(&mut self, freqs: Vec<f32>) {
         for (i, oscillator) in self.oscillators.iter_mut().enumerate() {
             if i < freqs.len() {
-                oscillator.set_waveform(freqs[i], sample_rate);
+                oscillator.set_waveform(freqs[i]);
             } else {
                 break
             }
@@ -29,17 +29,25 @@ impl PolyOscillator {
     }
 }
 
-impl AudioGenerator for PolyOscillator {
-    fn tick(&mut self, sample_rate: f32) -> f32 {
+impl Module for PolyOscillator {
+    fn tick(&mut self) -> Data {
         let mut value = 0.0;
         let mut active = 0;
         for osc in self.oscillators.iter_mut() {
             if !osc.waveform.is_empty() {
-                value += osc.tick(sample_rate);
+                value += osc.tick().audio();
                 active += 1;
             }
         }
-        value / active as f32
+        Data::Audio(value / active as f32)
     }
-}
 
+    fn get_output_type(&self) -> DataType { DataType::Audio }
+    fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![(DataType::Notes, "notes")] }
+
+    fn send(&mut self, _input: usize, data: Data) {
+        self.set_freqs(data.notes().iter().map(|note| note.freq()).collect())
+    }
+
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+}

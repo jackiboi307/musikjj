@@ -4,30 +4,61 @@ pub use utils::*;
 mod components;
 pub use components::*;
 
-pub const ROOT: u8 = 12 * 3;
+use std::sync::atomic::*;
+
+pub static SAMPLE_RATE: AtomicU32 = AtomicU32::new(0);
+
+pub fn set_sample_rate(sample_rate: u32) {
+    SAMPLE_RATE.store(sample_rate, Ordering::Relaxed);
+}
+
+pub fn get_sample_rate() -> u32 {
+    SAMPLE_RATE.load(Ordering::Relaxed)
+}
+
+pub const ROOT: u8 = 12 * 4;
 pub const BPM: f32 = 180.0;
 
-pub trait AudioGenerator {
-    fn tick(&mut self, sample_rate: f32) -> f32;
+#[derive(Debug)]
+pub enum DataType {
+    Audio,
+    Notes,
 }
 
-pub trait AudioProcessor {
-    fn tick(&mut self, sample_rate: f32, value: f32) -> f32;
-    fn step(&mut self) {}
+#[derive(Debug, Clone)]
+pub enum Data {
+    Audio(f32),
+    Notes(Box<[Note]>),
 }
 
-pub trait NoteGenerator {
-    fn note_tick(&mut self) -> Option<Box<[Note]>>;
-}
-
-// pub trait NoteProcessor {
-//     fn tick(&mut self, notes: &[Note]) -> Option<Box<[Note]>>;
-// }
-
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Note {
     Midi(u8),
     Freq(f32),
+}
+
+pub trait Module {
+    fn get_output_type(&self) -> DataType;
+    fn get_inputs(&self) -> Vec<(DataType, &'static str)>;
+    fn tick(&mut self) -> Data;
+    fn send(&mut self, _input: usize, _data: Data);
+    fn as_any(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl Data {
+    fn audio(self) -> f32 {
+        match self {
+            Self::Audio(value) => value,
+            _ => panic!()
+        }
+    }
+
+    fn notes(self) -> Box<[Note]> {
+        match self {
+            Self::Notes(notes) => notes,
+            _ => panic!()
+        }
+    }
 }
 
 impl Note {

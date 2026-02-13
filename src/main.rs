@@ -7,6 +7,7 @@ use cpal::{
 use std::{
     io::{self, Write},
     sync::{Arc, Mutex},
+    collections::HashMap,
 };
 
 use musikjj::*;
@@ -14,18 +15,22 @@ use musikjj::*;
 fn main() -> anyhow::Result<()> {
     let app = Arc::new(Mutex::new(App::new()));
     let stream = stream_setup_for(Arc::clone(&app))?;
+
     println!("Playing...");
     stream.play()?;
 
     println!("Enter notes (example: '0 4 7 4' for a major arp)");
+
     loop {
         let notes = read_line(">>> ")?;
-        let notes: Vec<Note> = notes
+        let notes: Vec<Box<[Note]>> = notes
             .split_ascii_whitespace()
-            .map(|note| Note::Midi(ROOT + note.trim().parse::<u8>().unwrap()))
+            .map(|note| vec![Note::Midi(ROOT + note.trim().parse::<u8>().unwrap())].into_boxed_slice())
             .collect();
+
         let mut app = app.lock().unwrap();
-        app.sequencer.sequence = notes;
+        let seq: &mut Sequencer = app.module(2).as_any().downcast_mut::<Sequencer>().unwrap();
+        seq.sequence = notes;
     }
 }
 
@@ -38,45 +43,84 @@ fn read_line(prompt: &str) -> io::Result<String> {
     Ok(buffer)
 }
 
+type ModuleId = u16;
+
 struct App {
-    sample_rate: f32,
-    sequencer: Sequencer,
-    generator: PolyOscillator,
-    processors: Vec<Box<dyn AudioProcessor + Send>>,
+    modules: HashMap<ModuleId, Box<dyn Module + Send>>,
+    conns: HashMap<(ModuleId, usize), ModuleId>,
+    cached: HashMap<ModuleId, Data>,
+    next_id: ModuleId,
 }
 
 impl App {
     fn new() -> Self {
-        let mut oscillator = PolyOscillator::new();
-        oscillator.set_oscillators(3);
-
         Self {
-            sample_rate: 0.0,
-            sequencer: Sequencer::new(),
-            generator: oscillator,
-            processors: vec![Box::new(Adsr::new())],
+            modules: HashMap::new(),
+            conns: HashMap::new(),
+            cached: HashMap::new(),
+            next_id: 1,
         }
     }
 
-    fn step(&mut self) {
-        for processor in self.processors.iter_mut() {
-            processor.step();
-        }
+    fn init(&mut self) {
+        let mut osc = PolyOscillator::new();
+        osc.set_oscillators(3);
+        let osc = self.insert_module(Box::new(osc));
+
+        let seq = self.insert_module(Box::new(Sequencer::new()));
+        let adsr = self.insert_module(Box::new(Adsr::new()));
+
+        self.connect(seq, (osc, 0));
+        self.connect(seq, (adsr, 1));
+        self.connect(osc, (adsr, 0));
+        self.connect(adsr, (0, 0));
     }
 
-    fn get_sample(&mut self) -> f32 {
-        let mut value = self.generator.tick(self.sample_rate);
-        for processor in self.processors.iter_mut() {
-            value = processor.tick(self.sample_rate, value);
-        }
-        value
+    fn module(&mut self, module: ModuleId) -> &mut Box<dyn Module + Send> {
+        self.modules.get_mut(&module).unwrap()
     }
 
-    fn tick(&mut self) {
-        if let Some(notes) = self.sequencer.note_tick() {
-            let notes: Vec<_> = notes.iter().map(|note| note.clone().freq()).collect();
-            self.generator.set_freqs(&*notes, self.sample_rate);
-            self.step();
+    fn insert_module(&mut self, module: Box<dyn Module + Send>) -> ModuleId {
+        self.modules.insert(self.next_id, module);
+        self.next_id += 1;
+        self.next_id - 1
+    }
+
+    fn connect(&mut self, output: ModuleId, input: (ModuleId, usize)) {
+        self.conns.insert(input, output);
+    }
+
+    fn get_output(&mut self, id: ModuleId) -> Data {
+        // TODO do not clone?
+
+        if let Some(data) = self.cached.get(&id) {
+            return data.clone()
+        }
+
+        let data = if id != 0 {
+            let inputs = self.modules[&id].get_inputs();
+            for input_index in 0..inputs.len() {
+                if let Some(input_id) = self.conns.get(&(id, input_index)) {
+                    let data = self.get_output(*input_id);
+                    self.module(id).send(input_index, data);
+                }
+            }
+            self.module(id).tick()
+
+        } else {
+            let input_id = self.conns.get(&(id, 0)).unwrap();
+            self.get_output(*input_id)
+        };
+
+        self.cached.insert(id, data.clone());
+        data
+    }
+
+    fn tick(&mut self) -> f32 {
+        self.cached.clear();
+        match self.get_output(0) {
+            Data::Audio(audio) => audio,
+            _ => unreachable!()
         }
     }
 }
@@ -133,10 +177,11 @@ fn make_stream<T>(
     where T: SizedSample + FromSample<f32> {
 
     let num_channels = config.channels as usize;
+    set_sample_rate(config.sample_rate);
 
     {
         let mut app = app.lock().unwrap();
-        app.sample_rate = config.sample_rate as f32;
+        app.init();
     }
 
     let err_fn = |err| eprintln!(
@@ -145,21 +190,6 @@ fn make_stream<T>(
     let stream = device.build_output_stream(
         config,
         move |output: &mut [T], _: &cpal::OutputCallbackInfo| {
-            {
-                let mut app = app.lock().unwrap();
-                app.tick();
-
-                // let now = SystemTime::now();
-                // let elapsed = now
-                //     .duration_since(last_step_time)
-                //     .unwrap();
-
-                // if elapsed >= step_duration {
-                //     app.step();
-                //     last_step_time = now;
-                // }
-            }
-
             process_frame(output, &app, num_channels)
         },
         err_fn,
@@ -178,10 +208,9 @@ fn process_frame<SampleType>(
     for frame in output.chunks_mut(num_channels) {
         let value: SampleType = {
             let mut app = app.lock().unwrap();
-            SampleType::from_sample(app.get_sample())
+            SampleType::from_sample(app.tick() * 1.0)
         };
 
-        // copy the same value to all channels
         for sample in frame.iter_mut() {
             *sample = value;
         }

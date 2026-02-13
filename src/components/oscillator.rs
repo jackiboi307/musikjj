@@ -23,14 +23,14 @@ impl Oscillator {
         }
     }
 
-    pub fn set_waveform(&mut self, freq: f32, sample_rate: f32) {
-        self.waveform = self.get_waveform(freq, sample_rate);
+    pub fn set_waveform(&mut self, freq: f32) {
+        self.waveform = self.get_waveform(freq);
         self.index = 0;
     }
 
-    fn get_waveform(&self, freq: f32, sample_rate: f32) -> Box<[f32]> {
+    fn get_waveform(&self, freq: f32) -> Box<[f32]> {
         let mut waveform = Vec::new();
-        let max = sample_rate as usize / freq as usize;
+        let max = get_sample_rate() as usize / freq as usize;
         for i in 0..max {
             let i = i as f32 / max as f32;
             let value = match self.waveshape {
@@ -61,14 +61,22 @@ impl Oscillator {
     // }
 }
 
-impl AudioGenerator for Oscillator {
-    fn tick(&mut self, _sample_rate: f32) -> f32 {
+impl Module for Oscillator {
+    fn tick(&mut self) -> Data {
         if !self.waveform.is_empty() {
             self.index = (self.index + 1) % self.waveform.len();
-            self.waveform[self.index]
+            Data::Audio(self.waveform[self.index])
         } else {
-            0.0
+            Data::Audio(0.0)
         }
     }
-}
 
+    fn get_output_type(&self) -> DataType { DataType::Audio }
+    fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![(DataType::Notes, "note")] }
+
+    fn send(&mut self, _input: usize, data: Data) {
+        self.set_waveform(data.notes()[0].freq());
+    }
+
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+}
