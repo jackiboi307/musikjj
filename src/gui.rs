@@ -3,12 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use sdl2::{
     event::Event,
-    keyboard::{Keycode, Scancode},
-    mouse::MouseButton,
+    keyboard::Scancode,
     pixels::{Color, PixelFormatEnum},
     rect::Rect,
-    surface::{Surface, SurfaceRef},
-    render::{WindowCanvas, SurfaceCanvas},
+    surface::Surface,
+    render::SurfaceCanvas,
     ttf::Font,
     gfx::primitives::DrawRenderer,
 };
@@ -80,11 +79,39 @@ pub struct Gui {
     modules: HashMap<ModuleId, ModuleWindow>,
 }
 
+enum Selection {
+    Window(u16, Rect, i32, i32),
+    Output(ModuleId),
+    Input(ModuleId, usize),
+}
+
 impl Gui {
     pub fn new() -> Self {
         Self {
             modules: HashMap::new(),
         }
+    }
+
+    fn get_selected_conn(&self, x: i32, y: i32) -> Option<Selection> {
+        for (i, module) in self.modules.iter() {
+            let (cx, cy) = module.output_conn();
+            if cx - 10 < x && x < cx + 10 && cy - 10 < y && y < cy + 10 {
+                return Some(Selection::Output(*i));
+            }
+
+            for (conn_id, (cx, cy)) in module.input_conns().iter().enumerate() {
+                if cx - 10 < x && x < cx + 10 && cy - 10 < y && y < cy + 10 {
+                    return Some(Selection::Input(*i, conn_id));
+                }
+            }
+
+            let rect = module.rect();
+            if rect.contains_point((x, y)) {
+                return Some(Selection::Window(i.clone(), rect, x, y));
+            }
+        }
+
+        None
     }
 
     pub fn run(&mut self, app: Arc<Mutex<App>>) {
@@ -116,19 +143,36 @@ impl Gui {
             }
         }
 
-        let mut pressed_data = None;
+        let mut selection = None;
 
         'running: loop {
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. } => break 'running,
                     Event::MouseButtonDown { x, y, .. } => {
-                        for (i, module) in self.modules.iter() {
-                            let rect = module.rect();
-                            if rect.contains_point((x, y)) {
-                                pressed_data = Some((i.clone(), rect, x, y));
-                                break
+                        selection = self.get_selected_conn(x, y);
+                    }
+                    Event::MouseButtonUp { x, y, .. } => {
+                        let mut app = app.lock().unwrap();
+                        let new_selection = self.get_selected_conn(x, y);
+                        match new_selection {
+                            Some(Selection::Output(out_id)) => {
+                                match selection {
+                                    Some(Selection::Input(in_id, conn_id)) => {
+                                        app.connect(out_id, (in_id, conn_id));
+                                    }
+                                    _ => {}
+                                }
                             }
+                            Some(Selection::Input(in_id, conn_id)) => {
+                                match selection {
+                                    Some(Selection::Output(out_id)) => {
+                                        app.connect(out_id, (in_id, conn_id));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
                         }
                     }
                     _ => {}
@@ -138,35 +182,56 @@ impl Gui {
             let keyboard = event_pump.keyboard_state();
             let mouse = event_pump.mouse_state();
 
-            if let Some((module_id, start_rect, mx, my)) = pressed_data {
-                if !keyboard.is_scancode_pressed(Scancode::LCtrl) {
-                    pressed_data = None;
-
-                } else {
-                    let module = self.modules.get_mut(&module_id).unwrap();
-
-                    let dx = mouse.x().saturating_sub(mx);
-                    let dy = mouse.y().saturating_sub(my);
-
-                    if mouse.left() {
-                        module.x = start_rect.x() + dx;
-                        module.y = start_rect.y() + dy;
-
-                    } else if mouse.right() {
-                        module.width  = i32::max(50, start_rect.width()  as i32 + dx) as u32;
-                        module.height = i32::max(50, start_rect.height() as i32 + dy) as u32;
-
-                    } else {
-                        pressed_data = None;
-                    }
-                }
-            }
-
             canvas.set_draw_color(Color::RGB(150, 180, 190));
             canvas.clear();
 
+            match selection {
+                Some(Selection::Window(module_id, start_rect, mx, my)) => {
+                    if !keyboard.is_scancode_pressed(Scancode::LCtrl) {
+                        selection = None;
+
+                    } else {
+                        let module = self.modules.get_mut(&module_id).unwrap();
+
+                        let dx = mouse.x().saturating_sub(mx);
+                        let dy = mouse.y().saturating_sub(my);
+
+                        if mouse.left() {
+                            module.x = start_rect.x() + dx;
+                            module.y = start_rect.y() + dy;
+
+                        } else if mouse.right() {
+                            module.width  = i32::max(50, start_rect.width()  as i32 + dx) as u32;
+                            module.height = i32::max(50, start_rect.height() as i32 + dy) as u32;
+
+                        } else {
+                            selection = None;
+                        }
+                    }
+                }
+                Some(Selection::Output(mod_id)) => {
+                    if mouse.left() {
+                        let output_conn = self.modules[&mod_id].output_conn();
+                        canvas.set_draw_color(Color::RGB(255, 0, 0));
+                        canvas.draw_line(output_conn, (mouse.x(), mouse.y())).unwrap();
+                    } else {
+                        selection = None;
+                    }
+                }
+                Some(Selection::Input(mod_id, conn_id)) => {
+                    if mouse.left() {
+                        let input_conn = self.modules[&mod_id].input_conns()[conn_id];
+                        canvas.set_draw_color(Color::RGB(255, 0, 0));
+                        canvas.draw_line(input_conn, (mouse.x(), mouse.y())).unwrap();
+                    } else {
+                        selection = None;
+                    }
+                }
+                _ => {}
+            }
+
             {
-                let mut app = app.lock().unwrap();
+                let app = app.lock().unwrap();
 
                 // TODO update this less often
                 for (i, module) in app.modules.iter() {

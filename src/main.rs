@@ -16,14 +16,14 @@ use std::{
 fn main() -> anyhow::Result<()> {
     let app = Arc::new(Mutex::new(App::new()));
 
-    {
-        let mut app = app.lock().unwrap();
-        app.init();
-    }
+    // {
+    //     let mut app = app.lock().unwrap();
+    //     app.init();
+    // }
 
-    // let stream = stream_setup_for(Arc::clone(&app))?;
-    // println!("Playing...");
-    // stream.play()?;
+    let stream = stream_setup_for(Arc::clone(&app))?;
+    println!("Playing...");
+    stream.play()?;
 
     let mut gui = gui::Gui::new();
     gui.run(Arc::clone(&app));
@@ -62,15 +62,15 @@ impl App {
     fn init(&mut self) {
         let mut osc = PolyOscillator::new();
         osc.set_oscillators(3);
-        let osc = self.insert_module(Box::new(osc));
 
-        let seq = self.insert_module(Box::new(Sequencer::new()));
-        let adsr = self.insert_module(Box::new(Adsr::new()));
+        self.insert_module(Box::new(osc));
+        self.insert_module(Box::new(Sequencer::new()));
+        self.insert_module(Box::new(Adsr::new()));
 
-        self.connect(seq, (osc, 0));
-        self.connect(seq, (adsr, 1));
-        self.connect(osc, (adsr, 0));
-        self.connect(adsr, (0, 0));
+        // self.connect(seq, (osc, 0));
+        // self.connect(seq, (adsr, 1));
+        // self.connect(osc, (adsr, 0));
+        // self.connect(adsr, (0, 0));
     }
 
     fn module(&mut self, module: ModuleId) -> &mut Box<dyn Module + Send> {
@@ -84,6 +84,13 @@ impl App {
     }
 
     fn connect(&mut self, output: ModuleId, input: (ModuleId, usize)) {
+        if let Some(existing_out) = self.conns.get(&input) {
+            if output == *existing_out {
+                self.conns.remove(&input);
+                return
+            }
+        }
+
         self.conns.insert(input, output);
     }
 
@@ -105,8 +112,15 @@ impl App {
             self.module(id).tick()
 
         } else {
-            let input_id = self.conns.get(&(id, 0)).unwrap();
-            self.get_output(*input_id)
+            if let Some(input_id) = self.conns.get(&(id, 0)) {
+                self.get_output(*input_id)
+            } else {
+                if id == 0 {
+                    Data::Audio(0.0)
+                } else {
+                    panic!()
+                }
+            }
         };
 
         self.cached.insert(id, data.clone());
@@ -117,7 +131,7 @@ impl App {
         self.cached.clear();
         match self.get_output(0) {
             Data::Audio(audio) => audio,
-            _ => unreachable!()
+            _ => 0.0
         }
     }
 }
