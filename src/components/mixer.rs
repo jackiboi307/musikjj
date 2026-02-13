@@ -21,6 +21,7 @@ impl Module for Mixer {
         data
     }
 
+    fn title(&self) -> &'static str { "Mixer" }
     fn get_output_type(&self) -> DataType { DataType::Audio }
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>
         { vec![(DataType::Audio, "input"); self.input_count] }

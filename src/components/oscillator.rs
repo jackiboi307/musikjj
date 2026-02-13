@@ -71,6 +71,7 @@ impl Module for Oscillator {
         }
     }
 
+    fn title(&self) -> &'static str { "Oscillator" }
     fn get_output_type(&self) -> DataType { DataType::Audio }
     fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![(DataType::Notes, "note")] }
 

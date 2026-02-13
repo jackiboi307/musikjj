@@ -7,3 +7,7 @@ edition = "2024"
 anyhow = "1.0.101"
 clap = "4.5.57"
 cpal = "0.17.1"
+
+[dependencies.sdl2]
+version = "0.38.0"
+features = ["ttf", "gfx"]

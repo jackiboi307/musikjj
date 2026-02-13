@@ -62,6 +62,7 @@ impl Module for Sequencer {
         }
     }
 
+    fn title(&self) -> &'static str { "Sequencer" }
     fn get_output_type(&self) -> DataType { DataType::Notes }
     fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![] }
     fn send(&mut self, _input: usize, _data: Data) { unimplemented!() }

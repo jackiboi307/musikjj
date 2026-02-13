@@ -38,6 +38,7 @@ pub enum Note {
 }
 
 pub trait Module {
+    fn title(&self) -> &'static str;
     fn get_output_type(&self) -> DataType;
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>;
     fn tick(&mut self) -> Data;

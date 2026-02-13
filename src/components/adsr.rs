@@ -22,6 +22,7 @@ impl Module for Adsr {
         Data::Audio(self.input * f32::max(0.0, 1.0 - self.index))
     }
 
+    fn title(&self) -> &'static str { "Adsr" }
     fn get_output_type(&self) -> DataType { DataType::Audio }
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>
         { vec![(DataType::Audio, "audio"), (DataType::Notes, "gate")] }

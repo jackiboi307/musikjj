@@ -42,6 +42,7 @@ impl Module for PolyOscillator {
         Data::Audio(value / active as f32)
     }
 
+    fn title(&self) -> &'static str { "PolyOscillator" }
     fn get_output_type(&self) -> DataType { DataType::Audio }
     fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![(DataType::Notes, "notes")] }
 

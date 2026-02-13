@@ -1,3 +1,6 @@
+mod gui;
+use musikjj::*;
+
 use cpal::{
     FromSample, Sample,
     traits::{DeviceTrait, HostTrait, StreamTrait},
@@ -10,30 +13,24 @@ use std::{
     collections::HashMap,
 };
 
-use musikjj::*;
-
 fn main() -> anyhow::Result<()> {
     let app = Arc::new(Mutex::new(App::new()));
-    let stream = stream_setup_for(Arc::clone(&app))?;
 
-    println!("Playing...");
-    stream.play()?;
-
-    println!("Enter notes (example: '0 4 7 4' for a major arp)");
-
-    loop {
-        let notes = read_line(">>> ")?;
-        let notes: Vec<Box<[Note]>> = notes
-            .split_ascii_whitespace()
-            .map(|note| vec![Note::Midi(ROOT + note.trim().parse::<u8>().unwrap())].into_boxed_slice())
-            .collect();
-
+    {
         let mut app = app.lock().unwrap();
-        let seq: &mut Sequencer = app.module(2).as_any().downcast_mut::<Sequencer>().unwrap();
-        seq.sequence = notes;
+        app.init();
     }
+
+    // let stream = stream_setup_for(Arc::clone(&app))?;
+    // println!("Playing...");
+    // stream.play()?;
+
+    let mut gui = gui::Gui::new();
+    gui.run(Arc::clone(&app));
+    Ok(())
 }
 
+#[allow(dead_code)]
 fn read_line(prompt: &str) -> io::Result<String> {
     let mut buffer = String::new();
     let stdin = io::stdin();
@@ -153,13 +150,17 @@ fn host_device_setup()
 
     let host = cpal::default_host();
     let devices: Vec<_> = host.output_devices()?.collect();
-    println!("Devices:");
-    for (i, device) in devices.iter().enumerate() {
-        println!("\t{i}: {}: {}", device.id()?, device.description()?);
-    }
 
-    let input = read_line("Select device > ")?;
-    let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
+    // default to id 6 (pulseaudio)
+    let device = devices[6].clone();
+
+    // println!("Devices:");
+    // for (i, device) in devices.iter().enumerate() {
+    //     println!("\t{i}: {}: {}", device.id()?, device.description()?);
+    // }
+
+    // let input = read_line("Select device > ")?;
+    // let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
 
     println!("Output device: {}", device.id()?);
 
