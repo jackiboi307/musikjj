@@ -19,7 +19,7 @@ pub fn get_sample_rate() -> u32 {
 pub const ROOT: u8 = 12 * 4;
 pub const BPM: f32 = 180.0;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DataType {
     Audio,
     Notes,

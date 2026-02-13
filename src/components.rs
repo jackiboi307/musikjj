@@ -9,3 +9,6 @@ pub use adsr::Adsr;
 
 mod sequencer;
 pub use sequencer::Sequencer;
+
+mod mixer;
+pub use mixer::Mixer;

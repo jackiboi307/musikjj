@@ -11,7 +11,7 @@ impl Adsr {
         Self {
             input: 0.0,
             index: 0.0,
-            decay: 0.15,
+            decay: 0.10,
         }
     }
 }
