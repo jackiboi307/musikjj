@@ -42,8 +42,23 @@ pub trait Module {
     fn get_output_type(&self) -> DataType;
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>;
     fn tick(&mut self) -> Data;
-    fn send(&mut self, _input: usize, _data: Data);
+    fn send(&mut self, _input: usize, _data: Data) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any;
+}
+
+#[macro_export]
+macro_rules! define_module {
+    (
+        $(title: $title:expr,)?
+        $(output: $output_type:ident,)?
+        $(inputs: [$(($input_type:ident, $input_label:expr)$(,)?)*],)?
+    ) => {
+        $(fn title(&self) -> &'static str { $title })?
+        $(fn get_output_type(&self) -> DataType { DataType::$output_type })?
+        $(fn get_inputs(&self) -> Vec<(DataType, &'static str)>
+            { vec![$((DataType::$input_type, $input_label),)*] })?
+        fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    }
 }
 
 impl Data {

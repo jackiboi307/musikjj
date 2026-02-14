@@ -71,13 +71,13 @@ impl Module for Oscillator {
         }
     }
 
-    fn title(&self) -> &'static str { "Oscillator" }
-    fn get_output_type(&self) -> DataType { DataType::Audio }
-    fn get_inputs(&self) -> Vec<(DataType, &'static str)> { vec![(DataType::Notes, "note")] }
+    define_module! {
+        title: "Oscillator",
+        output: Audio,
+        inputs: [(Notes, "note")],
+    }
 
     fn send(&mut self, _input: usize, data: Data) {
         self.set_waveform(data.notes()[0].freq());
     }
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
 }

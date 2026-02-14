@@ -22,10 +22,11 @@ impl Module for Adsr {
         Data::Audio(self.input * f32::max(0.0, 1.0 - self.index))
     }
 
-    fn title(&self) -> &'static str { "Adsr" }
-    fn get_output_type(&self) -> DataType { DataType::Audio }
-    fn get_inputs(&self) -> Vec<(DataType, &'static str)>
-        { vec![(DataType::Audio, "audio"), (DataType::Notes, "gate")] }
+    define_module! {
+        title: "Adsr",
+        output: Audio,
+        inputs: [(Audio, "audio"), (Notes, "gate")],
+    }
 
     fn send(&mut self, input: usize, data: Data) {
         match input {
@@ -39,6 +40,4 @@ impl Module for Adsr {
             _ => panic!()
         }
     }
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
 }
