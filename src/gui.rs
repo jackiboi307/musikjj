@@ -81,7 +81,7 @@ impl ModuleWindow {
 }
 
 pub struct Gui {
-    modules: HashMap<ModuleId, ModuleWindow>,
+    modules: Vec<(ModuleId, ModuleWindow)>,
 }
 
 enum Selection {
@@ -93,23 +93,34 @@ enum Selection {
 impl Gui {
     pub fn new() -> Self {
         Self {
-            modules: HashMap::new(),
+            modules: Vec::new(),
         }
     }
 
-    fn get_selected_conn(&self, x: i32, y: i32) -> Option<Selection> {
-        // TODO do not collect into Vec, which is a temporary solution to
-        // select the correct window
-        for (i, module) in self.modules.iter().collect::<Vec<_>>().iter().rev() {
+    fn module(&mut self, id: ModuleId) -> &mut ModuleWindow {
+        for (iter_id, module) in self.modules.iter_mut() {
+            if id == *iter_id {
+                return module
+            }
+        }
+
+        panic!()
+    }
+
+    fn get_selected_conn(&mut self, x: i32, y: i32) -> Option<Selection> {
+        // selection box size
+        const SEL: i32 = 20;
+
+        for (i, module) in self.modules.iter().rev() {
             let i = *i;
             let (cx, cy) = module.output_conn();
-            if cx - 10 < x && x < cx + 10 && cy - 10 < y && y < cy + 10 {
-                return Some(Selection::Output(*i));
+            if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
+                return Some(Selection::Output(i));
             }
 
             for (conn_id, (cx, cy)) in module.input_conns().iter().enumerate() {
-                if cx - 10 < x && x < cx + 10 && cy - 10 < y && y < cy + 10 {
-                    return Some(Selection::Input(*i, conn_id));
+                if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
+                    return Some(Selection::Input(i, conn_id));
                 }
             }
 
@@ -138,16 +149,16 @@ impl Gui {
         let texture_creator = canvas.texture_creator();
         let ttf_context = sdl2::ttf::init().unwrap();
 
-        let font = ttf_context.load_font("/usr/share/fonts/gnu-free/FreeMono.otf", 16).unwrap();
+        let font = ttf_context.load_font("assets/FreeMono.otf", 16).unwrap();
 
         let mut output_win = ModuleWindow::new("Output");
         output_win.inputs = vec![(DataType::Audio, "")];
-        self.modules.insert(0, output_win);
+        self.modules.push((0, output_win));
 
         {
             let app = app.lock().unwrap();
             for (id, module) in app.modules.iter() {
-                self.modules.insert(*id, ModuleWindow::new(module.title()));
+                self.modules.push((*id, ModuleWindow::new(module.title())));
             }
         }
 
@@ -199,7 +210,7 @@ impl Gui {
                         selection = None;
 
                     } else {
-                        let module = self.modules.get_mut(&module_id).unwrap();
+                        let module = self.module(module_id);
 
                         let dx = mouse.x().saturating_sub(mx);
                         let dy = mouse.y().saturating_sub(my);
@@ -219,7 +230,7 @@ impl Gui {
                 }
                 Some(Selection::Output(mod_id)) => {
                     if mouse.left() {
-                        let output_conn = self.modules[&mod_id].output_conn();
+                        let output_conn = self.module(mod_id).output_conn();
                         canvas.set_draw_color(COLOR_CONN);
                         canvas.draw_line(output_conn, (mouse.x(), mouse.y())).unwrap();
                     } else {
@@ -228,7 +239,7 @@ impl Gui {
                 }
                 Some(Selection::Input(mod_id, conn_id)) => {
                     if mouse.left() {
-                        let input_conn = self.modules[&mod_id].input_conns()[conn_id];
+                        let input_conn = self.module(mod_id).input_conns()[conn_id];
                         canvas.set_draw_color(COLOR_CONN);
                         canvas.draw_line(input_conn, (mouse.x(), mouse.y())).unwrap();
                     } else {
@@ -243,14 +254,14 @@ impl Gui {
 
                 // TODO update this less often
                 for (i, module) in app.modules.iter() {
-                    self.modules.get_mut(i).unwrap().inputs =
+                    self.module(*i).inputs =
                         module.get_inputs().iter().map(|i| (i.0.clone(), i.1.into())).collect();
                 }
 
                 canvas.set_draw_color(COLOR_CONN);
                 for ((input_id, conn_id), output_id) in &app.conns {
-                    let inputs = self.modules[&input_id].input_conns();
-                    canvas.draw_line(inputs[*conn_id], self.modules[&output_id].output_conn()).unwrap();
+                    let inputs = self.module(*input_id).input_conns();
+                    canvas.draw_line(inputs[*conn_id], self.module(*output_id).output_conn()).unwrap();
                 }
             }
 
