@@ -166,15 +166,15 @@ fn host_device_setup()
     let devices: Vec<_> = host.output_devices()?.collect();
 
     // default to id 6 (pulseaudio)
-    let device = devices[6].clone();
+    // let device = devices[6].clone();
 
-    // println!("Devices:");
-    // for (i, device) in devices.iter().enumerate() {
-    //     println!("\t{i}: {}: {}", device.id()?, device.description()?);
-    // }
+    println!("Devices:");
+    for (i, device) in devices.iter().enumerate() {
+        println!("\t{i}: {}: {}", device.id()?, device.description()?);
+    }
 
-    // let input = read_line("Select device > ")?;
-    // let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
+    let input = read_line("Select device > ")?;
+    let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
 
     println!("Output device: {}", device.id()?);
 

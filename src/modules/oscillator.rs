@@ -17,7 +17,7 @@ pub struct Oscillator {
 impl Oscillator {
     pub fn new() -> Self {
         Self {
-            waveshape: Waveshape::Saw,
+            waveshape: Waveshape::Sine,
             waveform: vec![].into(),
             index: 0,
         }

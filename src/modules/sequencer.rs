@@ -45,6 +45,8 @@ impl Module for Sequencer {
         let now = SystemTime::now();
 
         if self.next_step <= now {
+            println!("{:?}", now.duration_since(self.next_step).unwrap());
+
             let length = self.sequence.len();
             if length <= self.step {
                 self.step = 0;
