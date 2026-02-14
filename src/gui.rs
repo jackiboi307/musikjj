@@ -14,6 +14,11 @@ use sdl2::{
 
 use std::time::Duration;
 
+const COLOR_BG: Color = Color::RGB(150, 180, 190);
+const COLOR_WIN_BG: Color = Color::RGB(200, 200, 200);
+const COLOR_CONN: Color = Color::RGB(255, 0, 0);
+const COLOR_TEXT: Color = Color::RGB(0, 0, 0);
+
 struct ModuleWindow {
     // TODO change to i16?
     x: i32,
@@ -48,10 +53,10 @@ impl ModuleWindow {
 
         let rect = canvas.surface().rect();
 
-        canvas.set_draw_color(Color::RGB(200, 200, 200));
+        canvas.set_draw_color(COLOR_WIN_BG);
         canvas.clear();
 
-        let rendered_title = font.render(self.title).solid(Color::RGB(0, 0, 0)).unwrap();
+        let rendered_title = font.render(self.title).solid(COLOR_TEXT).unwrap();
         rendered_title.blit(rendered_title.rect(), canvas.surface_mut(), Rect::new(
             ((rect.width() / 2).saturating_sub(rendered_title.width() / 2)) as i32,
             0,
@@ -59,7 +64,7 @@ impl ModuleWindow {
             rendered_title.height()
         )).unwrap();
 
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.set_draw_color(COLOR_TEXT);
         canvas.draw_rect(rect).unwrap();
         // canvas.draw_line((0, rendered_title.height() as i32), (rect.width() as i32, rendered_title.height() as i32));
 
@@ -93,7 +98,10 @@ impl Gui {
     }
 
     fn get_selected_conn(&self, x: i32, y: i32) -> Option<Selection> {
-        for (i, module) in self.modules.iter() {
+        // TODO do not collect into Vec, which is a temporary solution to
+        // select the correct window
+        for (i, module) in self.modules.iter().collect::<Vec<_>>().iter().rev() {
+            let i = *i;
             let (cx, cy) = module.output_conn();
             if cx - 10 < x && x < cx + 10 && cy - 10 < y && y < cy + 10 {
                 return Some(Selection::Output(*i));
@@ -182,7 +190,7 @@ impl Gui {
             let keyboard = event_pump.keyboard_state();
             let mouse = event_pump.mouse_state();
 
-            canvas.set_draw_color(Color::RGB(150, 180, 190));
+            canvas.set_draw_color(COLOR_BG);
             canvas.clear();
 
             match selection {
@@ -212,7 +220,7 @@ impl Gui {
                 Some(Selection::Output(mod_id)) => {
                     if mouse.left() {
                         let output_conn = self.modules[&mod_id].output_conn();
-                        canvas.set_draw_color(Color::RGB(255, 0, 0));
+                        canvas.set_draw_color(COLOR_CONN);
                         canvas.draw_line(output_conn, (mouse.x(), mouse.y())).unwrap();
                     } else {
                         selection = None;
@@ -221,7 +229,7 @@ impl Gui {
                 Some(Selection::Input(mod_id, conn_id)) => {
                     if mouse.left() {
                         let input_conn = self.modules[&mod_id].input_conns()[conn_id];
-                        canvas.set_draw_color(Color::RGB(255, 0, 0));
+                        canvas.set_draw_color(COLOR_CONN);
                         canvas.draw_line(input_conn, (mouse.x(), mouse.y())).unwrap();
                     } else {
                         selection = None;
@@ -239,7 +247,7 @@ impl Gui {
                         module.get_inputs().iter().map(|i| (i.0.clone(), i.1.into())).collect();
                 }
 
-                canvas.set_draw_color(Color::RGB(255, 0, 0));
+                canvas.set_draw_color(COLOR_CONN);
                 for ((input_id, conn_id), output_id) in &app.conns {
                     let inputs = self.modules[&input_id].input_conns();
                     canvas.draw_line(inputs[*conn_id], self.modules[&output_id].output_conn()).unwrap();
@@ -252,12 +260,12 @@ impl Gui {
                 canvas.copy(&texture, surface.rect(), module_win.rect()).unwrap();
 
                 for input in module_win.input_conns() {
-                    canvas.filled_circle(input.0 as i16, input.1 as i16, 5, Color::RGB(255, 0, 0)).unwrap();
+                    canvas.filled_circle(input.0 as i16, input.1 as i16, 5, COLOR_CONN).unwrap();
                 }
 
                 if *i != 0 {
                     let output = module_win.output_conn();
-                    canvas.filled_circle(output.0 as i16, output.1 as i16, 5, Color::RGB(255, 0, 0)).unwrap();
+                    canvas.filled_circle(output.0 as i16, output.1 as i16, 5, COLOR_CONN).unwrap();
                 }
             }
 
