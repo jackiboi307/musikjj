@@ -1,8 +1,8 @@
 mod utils;
 pub use utils::*;
 
-mod components;
-pub use components::*;
+mod modules;
+pub use modules::*;
 
 use std::sync::atomic::*;
 
@@ -16,7 +16,7 @@ pub fn get_sample_rate() -> u32 {
     SAMPLE_RATE.load(Ordering::Relaxed)
 }
 
-pub const ROOT: u8 = 12 * 4;
+pub const ROOT: u8 = 12 * 6;
 pub const BPM: f32 = 180.0;
 
 #[derive(Debug, Clone)]
