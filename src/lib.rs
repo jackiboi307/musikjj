@@ -44,6 +44,9 @@ pub trait Module {
     fn tick(&mut self) -> Data;
     fn send(&mut self, _input: usize, _data: Data) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any;
+    fn draw(&self, _width: u32, _height: u32, _font: &sdl2::ttf::Font) -> Option<sdl2::surface::Surface<'_>> {
+        None
+    }
 }
 
 #[macro_export]

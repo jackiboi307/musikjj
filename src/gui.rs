@@ -82,10 +82,11 @@ impl ModuleWindow {
 
 pub struct Gui {
     modules: Vec<(ModuleId, ModuleWindow)>,
+    selected: ModuleId,
 }
 
 enum Selection {
-    Window(u16, Rect, i32, i32),
+    Window(ModuleId, Rect, i32, i32),
     Output(ModuleId),
     Input(ModuleId, usize),
 }
@@ -94,6 +95,7 @@ impl Gui {
     pub fn new() -> Self {
         Self {
             modules: Vec::new(),
+            selected: 0,
         }
     }
 
@@ -111,22 +113,26 @@ impl Gui {
         // selection box size
         const SEL: i32 = 20;
 
-        for (i, module) in self.modules.iter().rev() {
-            let i = *i;
+        for (id, module) in self.modules.iter().rev() {
+            let id = *id;
             let (cx, cy) = module.output_conn();
+
             if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
-                return Some(Selection::Output(i));
+                self.selected = id;
+                return Some(Selection::Output(id));
             }
 
             for (conn_id, (cx, cy)) in module.input_conns().iter().enumerate() {
                 if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
-                    return Some(Selection::Input(i, conn_id));
+                    self.selected = id;
+                    return Some(Selection::Input(id, conn_id));
                 }
             }
 
             let rect = module.rect();
             if rect.contains_point((x, y)) {
-                return Some(Selection::Window(i.clone(), rect, x, y));
+                self.selected = id;
+                return Some(Selection::Window(id.clone(), rect, x, y));
             }
         }
 
@@ -170,6 +176,17 @@ impl Gui {
                     Event::Quit { .. } => break 'running,
                     Event::MouseButtonDown { x, y, .. } => {
                         selection = self.get_selected_conn(x, y);
+                        let mut index = None;
+                        for (i, id) in self.modules.iter()
+                                .enumerate().map(|(i, (id, _))| (i, id)) {
+                            if *id == self.selected {
+                                index = Some(i);
+                            }
+                        }
+                        if let Some(index) = index {
+                            let old = self.modules.remove(index);
+                            self.modules.push(old);
+                        }
                     }
                     Event::MouseButtonUp { x, y, .. } => {
                         let mut app = app.lock().unwrap();
@@ -203,6 +220,27 @@ impl Gui {
 
             canvas.set_draw_color(COLOR_BG);
             canvas.clear();
+
+            for (id, module_win) in self.modules.iter() {
+                let surface = module_win.render(&font).into_surface();
+                let texture = surface.as_texture(&texture_creator).unwrap();
+                canvas.copy(&texture, surface.rect(), module_win.rect()).unwrap();
+
+                for input in module_win.input_conns() {
+                    canvas.filled_circle(input.0 as i16, input.1 as i16, 5, COLOR_CONN).unwrap();
+                }
+
+                if *id != 0 {
+                    let output = module_win.output_conn();
+                    canvas.filled_circle(output.0 as i16, output.1 as i16, 5, COLOR_CONN).unwrap();
+
+                    let mut app = app.lock().unwrap();
+                    if let Some(surface) = app.module(*id).draw(module_win.width, module_win.height, &font) {
+                        let texture = surface.as_texture(&texture_creator).unwrap();
+                        canvas.copy(&texture, surface.rect(), module_win.rect()).unwrap();
+                    }
+                }
+            }
 
             match selection {
                 Some(Selection::Window(module_id, start_rect, mx, my)) => {
@@ -262,21 +300,6 @@ impl Gui {
                 for ((input_id, conn_id), output_id) in &app.conns {
                     let inputs = self.module(*input_id).input_conns();
                     canvas.draw_line(inputs[*conn_id], self.module(*output_id).output_conn()).unwrap();
-                }
-            }
-
-            for (i, module_win) in self.modules.iter() {
-                let surface = module_win.render(&font).into_surface();
-                let texture = surface.as_texture(&texture_creator).unwrap();
-                canvas.copy(&texture, surface.rect(), module_win.rect()).unwrap();
-
-                for input in module_win.input_conns() {
-                    canvas.filled_circle(input.0 as i16, input.1 as i16, 5, COLOR_CONN).unwrap();
-                }
-
-                if *i != 0 {
-                    let output = module_win.output_conn();
-                    canvas.filled_circle(output.0 as i16, output.1 as i16, 5, COLOR_CONN).unwrap();
                 }
             }
 
