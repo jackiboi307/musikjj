@@ -7,8 +7,6 @@ use sdl2::{
     pixels::{Color, PixelFormatEnum},
     rect::Rect,
     surface::Surface,
-    render::SurfaceCanvas,
-    ttf::Font,
     gfx::primitives::DrawRenderer,
 };
 
@@ -16,6 +14,8 @@ use std::time::Duration;
 
 const COLOR_BG: Color = Color::RGB(150, 180, 190);
 const COLOR_WIN_BG: Color = Color::RGB(200, 200, 200);
+const COLOR_BORDER: Color = Color::RGB(80, 100, 120);
+const COLOR_BORDER_SEL: Color = Color::RGB(0, 0, 0);
 const COLOR_CONN: Color = Color::RGB(255, 0, 0);
 const COLOR_TEXT: Color = Color::RGB(0, 0, 0);
 
@@ -43,32 +43,6 @@ impl ModuleWindow {
 
     fn rect(&self) -> Rect {
         Rect::new(self.x, self.y, self.width, self.height)
-    }
-
-    fn render(&self, font: &Font) -> SurfaceCanvas<'_> {
-        let mut canvas =
-            Surface::new(self.width, self.height,
-                PixelFormatEnum::RGBA32).unwrap()
-            .into_canvas().unwrap();
-
-        let rect = canvas.surface().rect();
-
-        canvas.set_draw_color(COLOR_WIN_BG);
-        canvas.clear();
-
-        let rendered_title = font.render(self.title).solid(COLOR_TEXT).unwrap();
-        rendered_title.blit(rendered_title.rect(), canvas.surface_mut(), Rect::new(
-            ((rect.width() / 2).saturating_sub(rendered_title.width() / 2)) as i32,
-            0,
-            rect.width(),
-            rendered_title.height()
-        )).unwrap();
-
-        canvas.set_draw_color(COLOR_TEXT);
-        canvas.draw_rect(rect).unwrap();
-        // canvas.draw_line((0, rendered_title.height() as i32), (rect.width() as i32, rendered_title.height() as i32));
-
-        canvas
     }
 
     fn output_conn(&self) -> (i32, i32) {
@@ -222,7 +196,32 @@ impl Gui {
             canvas.clear();
 
             for (id, module_win) in self.modules.iter() {
-                let surface = module_win.render(&font).into_surface();
+                let mut mod_canvas =
+                    Surface::new(module_win.width, module_win.height,
+                        PixelFormatEnum::RGBA32).unwrap()
+                    .into_canvas().unwrap();
+
+                let rect = mod_canvas.surface().rect();
+
+                mod_canvas.set_draw_color(COLOR_WIN_BG);
+                mod_canvas.clear();
+
+                let rendered_title = font.render(module_win.title).solid(COLOR_TEXT).unwrap();
+                rendered_title.blit(rendered_title.rect(), mod_canvas.surface_mut(), Rect::new(
+                    ((rect.width() / 2).saturating_sub(rendered_title.width() / 2)) as i32,
+                    0,
+                    rect.width(),
+                    rendered_title.height()
+                )).unwrap();
+
+                mod_canvas.set_draw_color(if *id == self.selected {
+                    COLOR_BORDER_SEL
+                } else {
+                    COLOR_BORDER
+                });
+                mod_canvas.draw_rect(rect).unwrap();
+
+                let surface = mod_canvas.into_surface();
                 let texture = surface.as_texture(&texture_creator).unwrap();
                 canvas.copy(&texture, surface.rect(), module_win.rect()).unwrap();
 

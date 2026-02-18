@@ -12,6 +12,10 @@ cpal = "0.17.1"
 version = "0.38.0"
 features = ["ttf", "gfx"]
 
-[dependencies.termabc]
+# [dependencies.termabc]
+# version = "0.1.0"
+# path = "../termabc"
+
+[dependencies.semmel]
 version = "0.1.0"
-path = "../termabc"
+path = "../semmel"

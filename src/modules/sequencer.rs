@@ -64,42 +64,6 @@ impl Module for Sequencer {
         }
     }
     
-    fn draw(&self, width: u32, height: u32, font: &sdl2::ttf::Font) -> Option<sdl2::surface::Surface<'_>> {
-        use termabc::prelude::*;
-
-        let mut canvas = sdl2::surface::Surface::new(width, height,
-            sdl2::pixels::PixelFormatEnum::RGBA32).unwrap()
-            .into_canvas().unwrap();
-        let rect = canvas.surface().rect();
-
-        let (font_width, font_height) = font.size_of_char('a').unwrap();
-
-        let mut tui = InstructionBuffer::new(12, 12, None);
-        tui.addstr(0, 0, "hej världen", Some(&Style::new().fg(Color::True(255, 0, 0))));
-        tui.addstr(0, 1, "hej världen", Some(&Style::new().fg(Color::True(0, 255, 0))));
-        tui.addstr(0, 2, "hej världen", Some(&Style::new().fg(Color::True(0, 0, 255))));
-
-        for ((x, y), (ch, fg, bg)) in tui.render_to_chars().iter() {
-            let rendered = font.render_char(*ch)
-                .solid(sdl2::pixels::Color::RGB(fg.0, fg.1, fg.2))
-                .unwrap();
-
-            rendered.blit(rendered.rect(), canvas.surface_mut(), sdl2::rect::Rect::new(
-                (font_width * *x as u32) as i32,
-                (font_height * *y as u32) as i32,
-                rect.width(),
-                rendered.height()
-            )).unwrap();
-
-            if let Some(bg) = bg {
-                canvas.set_draw_color(sdl2::pixels::Color::RGB(bg.0, bg.1, bg.2));
-                canvas.fill_rect(rendered.rect()).unwrap();
-            }
-        }
-
-        Some(canvas.into_surface())
-    }
-
     define_module! {
         title: "Sequencer",
         output: Notes,
