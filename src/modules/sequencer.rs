@@ -63,7 +63,7 @@ impl Module for Sequencer {
             Data::Notes(Box::new([]))
         }
     }
-    
+
     define_module! {
         title: "Sequencer",
         output: Notes,

@@ -1,4 +1,6 @@
 mod gui;
+use gui::Gui;
+
 use musikjj::*;
 
 use cpal::{
@@ -13,31 +15,50 @@ use std::{
     collections::HashMap,
 };
 
+const ERASE_LINE: &'static str = "\x1b[2K";
+const CUR_COL_HOME: &'static str = "\x1b[0G";
+
 fn main() -> anyhow::Result<()> {
     let app = Arc::new(Mutex::new(App::new()));
-
-    // {
-    //     let mut app = app.lock().unwrap();
-    //     app.init();
-    // }
 
     let stream = stream_setup_for(Arc::clone(&app))?;
     println!("Playing...");
     stream.play()?;
 
-    let mut gui = gui::Gui::new();
+    let app_clone = Arc::clone(&app);
+    std::thread::spawn(move || read_loop(app_clone));
+
+    let mut gui = Gui::new();
     gui.run(Arc::clone(&app));
+
+    println!();
     Ok(())
 }
 
-#[allow(dead_code)]
+fn flush() {
+    let _ = io::stdout().flush();
+}
+
 fn read_line(prompt: &str) -> io::Result<String> {
     let mut buffer = String::new();
     let stdin = io::stdin();
     print!("{prompt}");
-    let _ = io::stdout().flush();
+    flush();
     stdin.read_line(&mut buffer)?;
-    Ok(buffer)
+    Ok(buffer.trim_end().to_string())
+}
+
+fn read_loop(app: Arc<Mutex<App>>) {
+    loop {
+        if let Ok(input) = read_line(">>> ") {
+            if input.find(|c: char| !c.is_ascii_whitespace()).is_some() {
+                let mut app = app.lock().unwrap();
+                app.execute(input);
+            }
+        } else {
+            break
+        }
+    }
 }
 
 type ModuleId = u16;
@@ -47,6 +68,7 @@ struct App {
     conns: HashMap<(ModuleId, usize), ModuleId>,
     cached: HashMap<ModuleId, Data>,
     next_id: ModuleId,
+    selection: Option<ModuleId>,
 }
 
 impl App {
@@ -56,6 +78,7 @@ impl App {
             conns: HashMap::new(),
             cached: HashMap::new(),
             next_id: 1,
+            selection: None,
         }
     }
 
@@ -66,11 +89,6 @@ impl App {
         self.insert_module(Box::new(osc));
         self.insert_module(Box::new(Sequencer::new()));
         self.insert_module(Box::new(Adsr::new()));
-
-        // self.connect(seq, (osc, 0));
-        // self.connect(seq, (adsr, 1));
-        // self.connect(osc, (adsr, 0));
-        // self.connect(adsr, (0, 0));
     }
 
     fn module(&mut self, module: ModuleId) -> &mut Box<dyn Module + Send> {
@@ -92,6 +110,30 @@ impl App {
         }
 
         self.conns.insert(input, output);
+    }
+
+    fn set_selection(&mut self, selection: Option<ModuleId>) {
+        if let Some(id) = selection {
+            if id == 0 {
+                return
+            }
+
+            if self.selection != selection {
+                print!(
+                    "{ERASE_LINE}{CUR_COL_HOME}Selected module: {} (id: {})\n>>> ",
+                    self.module(id).title(), id
+                );
+                flush();
+            }
+        }
+
+        self.selection = selection;
+    }
+
+    fn execute(&mut self, cmd: String) {
+        if let Some(selection) = self.selection {
+            self.module(selection).execute(cmd);
+        }
     }
 
     fn get_output(&mut self, id: ModuleId) -> Data {

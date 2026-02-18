@@ -59,6 +59,7 @@ pub struct Gui {
     selected: ModuleId,
 }
 
+#[derive(Clone)]
 enum Selection {
     Window(ModuleId, Rect, i32, i32),
     Output(ModuleId),
@@ -150,6 +151,7 @@ impl Gui {
                     Event::Quit { .. } => break 'running,
                     Event::MouseButtonDown { x, y, .. } => {
                         selection = self.get_selected_conn(x, y);
+
                         let mut index = None;
                         for (i, id) in self.modules.iter()
                                 .enumerate().map(|(i, (id, _))| (i, id)) {
@@ -157,10 +159,14 @@ impl Gui {
                                 index = Some(i);
                             }
                         }
+
                         if let Some(index) = index {
                             let old = self.modules.remove(index);
                             self.modules.push(old);
                         }
+
+                        let mut app = app.lock().unwrap();
+                        app.set_selection(selection.clone().map(|_| self.selected));
                     }
                     Event::MouseButtonUp { x, y, .. } => {
                         let mut app = app.lock().unwrap();
