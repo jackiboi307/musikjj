@@ -109,14 +109,15 @@ impl Module for Sequencer {
             if let Some(btn) = info.click {
                 if btn == MouseButton::Left {
                     let i = (info.x as u32 / note_width) as usize;
-                    let note = SCALE_LEN as u8 - 1 - (info.y as u32 / note_height) as u8;
-
-                    if (note as u16) < SCALE_LEN {
-                        if let Some(index) = self.sequence[i].iter()
-                                .position(|a| *a == note) {
-                            self.sequence[i].remove(index);
-                        } else {
-                            self.sequence[i].push(note);
+                    let note = (SCALE_LEN as u8 - 1).checked_sub((info.y as u32 / note_height) as u8);
+                    if let Some(note) = note {
+                        if (note as u16) < SCALE_LEN {
+                            if let Some(index) = self.sequence[i].iter()
+                                    .position(|a| *a == note) {
+                                self.sequence[i].remove(index);
+                            } else {
+                                self.sequence[i].push(note);
+                            }
                         }
                     }
                 }

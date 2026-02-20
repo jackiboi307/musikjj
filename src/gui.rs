@@ -20,6 +20,7 @@ const COLOR_TEXT: Color = Color::RGB(0, 0, 0);
 
 const DEFAULT_WIN_SIZE: u32 = 160;
 const WIN_PADDING: u8 = 20;
+const WIN_PADDING_TOP: u8 = 10; // extra top padding
 
 struct ModuleWindow {
     // TODO change to i16?
@@ -44,7 +45,7 @@ impl ModuleWindow {
     }
 
     fn padded_size(&self) -> (u32, u32) {
-        (self.width + WIN_PADDING as u32 * 2, self.height + WIN_PADDING as u32 * 2)
+        (self.width + WIN_PADDING as u32 * 2, self.height + WIN_PADDING as u32 * 2 + WIN_PADDING_TOP as u32)
     }
 
     fn rect(&self) -> Rect {
@@ -310,7 +311,7 @@ impl Gui {
 
                     let interact = if self.selected == *id && selection.is_none() {
                         let x = mouse.x() - module_win.x - WIN_PADDING as i32;
-                        let y = mouse.y() - module_win.y - WIN_PADDING as i32;
+                        let y = mouse.y() - module_win.y - WIN_PADDING as i32 - WIN_PADDING_TOP as i32;
 
                         if 0 <= x && x < module_win.width as i32
                             && 0 <= y && y < module_win.height as i32 {
@@ -331,8 +332,8 @@ impl Gui {
                             &texture,
                             surface.rect(),
                             module_win.rect()
-                                .right_shifted(WIN_PADDING.into())
-                                .bottom_shifted(WIN_PADDING.into())
+                                .right_shifted(WIN_PADDING as i32)
+                                .bottom_shifted(WIN_PADDING as i32 + WIN_PADDING_TOP as i32)
                         ).unwrap();
                         module_win.width = surface.rect().width();
                         module_win.height = surface.rect().height();
