@@ -66,7 +66,7 @@ type ModuleId = u16;
 struct App {
     modules: HashMap<ModuleId, Box<dyn Module + Send>>,
     conns: HashMap<(ModuleId, usize), ModuleId>,
-    cached: HashMap<ModuleId, Data>,
+    cached: HashMap<ModuleId, Option<Data>>,
     next_id: ModuleId,
     selection: Option<ModuleId>,
 }
@@ -136,7 +136,7 @@ impl App {
         }
     }
 
-    fn get_output(&mut self, id: ModuleId) -> Data {
+    fn get_output(&mut self, id: ModuleId) -> Option<Data> {
         // TODO do not clone?
 
         if let Some(data) = self.cached.get(&id) {
@@ -148,7 +148,9 @@ impl App {
             for input_index in 0..inputs.len() {
                 if let Some(input_id) = self.conns.get(&(id, input_index)) {
                     let data = self.get_output(*input_id);
-                    self.module(id).send(input_index, data);
+                    if let Some(data) = data {
+                        self.module(id).send(input_index, data);
+                    }
                 }
             }
             self.module(id).tick()
@@ -158,7 +160,7 @@ impl App {
                 self.get_output(*input_id)
             } else {
                 if id == 0 {
-                    Data::Audio(0.0)
+                    Some(Data::Audio(0.0))
                 } else {
                     panic!()
                 }
@@ -172,7 +174,7 @@ impl App {
     fn tick(&mut self) -> f32 {
         self.cached.clear();
         match self.get_output(0) {
-            Data::Audio(audio) => audio,
+            Some(Data::Audio(audio)) => audio,
             _ => 0.0
         }
     }

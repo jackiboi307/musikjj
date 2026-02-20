@@ -16,7 +16,6 @@ pub fn get_sample_rate() -> u32 {
     SAMPLE_RATE.load(Ordering::Relaxed)
 }
 
-pub const ROOT: u8 = 12 * 6;
 pub const BPM: f32 = 180.0;
 
 #[derive(Debug, Clone)]
@@ -31,20 +30,27 @@ pub enum Data {
     Notes(Box<[Note]>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Note {
     Midi(u8),
     Freq(f32),
+}
+
+pub struct ModuleInteractInfo<'a> {
+    pub x: u16,
+    pub y: u16,
+    pub click: Option<sdl2::mouse::MouseButton>,
+    pub events: &'a sdl2::EventPump,
 }
 
 pub trait Module {
     fn title(&self) -> &'static str;
     fn get_output_type(&self) -> DataType;
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>;
-    fn tick(&mut self) -> Data;
+    fn tick(&mut self) -> Option<Data>;
     fn send(&mut self, _input: usize, _data: Data) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any;
-    fn draw(&self, _width: u32, _height: u32, _font: &sdl2::ttf::Font)
+    fn draw(&mut self, _font: &sdl2::ttf::Font, _interact: Option<ModuleInteractInfo>)
         -> Option<sdl2::surface::Surface<'_>> { None }
     fn execute(&self, _cmd: String) {
         println!("Module::execute is not implemented for: {}", self.title());

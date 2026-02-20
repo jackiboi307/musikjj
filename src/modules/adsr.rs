@@ -17,9 +17,9 @@ impl Adsr {
 }
 
 impl Module for Adsr {
-    fn tick(&mut self) -> Data {
+    fn tick(&mut self) -> Option<Data> {
         self.index += 1.0 / self.decay / get_sample_rate() as f32;
-        Data::Audio(self.input * f32::max(0.0, 1.0 - self.index))
+        Some(Data::Audio(self.input * f32::max(0.0, 1.0 - self.index)))
     }
 
     define_module! {

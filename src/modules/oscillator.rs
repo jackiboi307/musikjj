@@ -17,7 +17,7 @@ pub struct Oscillator {
 impl Oscillator {
     pub fn new() -> Self {
         Self {
-            waveshape: Waveshape::Sine,
+            waveshape: Waveshape::Square,
             waveform: vec![].into(),
             index: 0,
         }
@@ -62,13 +62,13 @@ impl Oscillator {
 }
 
 impl Module for Oscillator {
-    fn tick(&mut self) -> Data {
-        if !self.waveform.is_empty() {
+    fn tick(&mut self) -> Option<Data> {
+        Some(if !self.waveform.is_empty() {
             self.index = (self.index + 1) % self.waveform.len();
             Data::Audio(self.waveform[self.index])
         } else {
             Data::Audio(0.0)
-        }
+        })
     }
 
     define_module! {

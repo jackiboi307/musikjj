@@ -15,10 +15,10 @@ impl Mixer {
 }
 
 impl Module for Mixer {
-    fn tick(&mut self) -> Data {
+    fn tick(&mut self) -> Option<Data> {
         let data = Data::Audio(self.values.iter().sum::<f32>() / self.values.len() as f32);
         self.values.clear();
-        data
+        Some(data)
     }
 
     define_module! {
