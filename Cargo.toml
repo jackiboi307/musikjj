@@ -16,6 +16,6 @@ features = ["ttf", "gfx"]
 # version = "0.1.0"
 # path = "../termabc"
 
-[dependencies.semmel]
-version = "0.1.0"
-path = "../semmel"
+# [dependencies.semmel]
+# version = "0.1.0"
+# path = "../semmel"
