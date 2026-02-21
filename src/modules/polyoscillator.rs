@@ -52,4 +52,44 @@ impl Module for PolyOscillator {
     fn send(&mut self, _input: usize, data: Data) {
         self.set_freqs(data.notes().iter().map(|note| note.freq()).collect())
     }
+
+    // fn draw(&mut self, font: &sdl2::ttf::Font, interact: Option<ModuleInteractInfo>)
+    //     -> Option<sdl2::surface::Surface<'_>> {
+
+    //     use sdl2::{
+    //         surface::Surface,
+    //         pixels::{Color, PixelFormatEnum},
+    //     };
+
+    //     let (width, height) = (200, 200);
+
+    //     let mut canvas =
+    //         Surface::new(width, height, PixelFormatEnum::RGBA32)
+    //         .unwrap().into_canvas().unwrap();
+
+    //     let mouse_pos = interact.as_ref().and_then(|info| Some((info.x, info.y)));
+    //     let mut layout = crate::ui_utils::SimpleLayoutBuilder::new((0, 0), mouse_pos);
+
+    //     let mut text = font.render("test1").solid(Color::WHITE).unwrap();
+    //     let (hovered, rect) = layout.add_rect(text.rect());
+    //     if hovered {
+    //         text.set_color_mod(Color::RED);
+    //     } else {
+    //         text.set_color_mod(Color::BLACK);
+    //     }
+    //     text.blit(text.rect(), canvas.surface_mut(), rect).unwrap();
+    //     layout.next_row();
+
+    //     let text = font.render(",test2").solid(Color::BLACK).unwrap();
+    //     let (hovered, rect) = layout.add_rect(text.rect());
+    //     text.blit(text.rect(), canvas.surface_mut(), rect).unwrap();
+
+    //     if let Some(info) = interact {
+    //         if info.click.is_some() && hovered {
+    //             println!("clicked");
+    //         }
+    //     }
+
+    //     Some(canvas.into_surface())
+    // }
 }
