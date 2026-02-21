@@ -320,7 +320,7 @@ impl Gui {
                                 x: x as u16,
                                 y: y as u16,
                                 click: clicked_mouse_btn,
-                                events: &event_pump,
+                                event_pump: &event_pump,
                             })
 
                         } else { None }

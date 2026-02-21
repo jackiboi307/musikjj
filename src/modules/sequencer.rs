@@ -63,8 +63,6 @@ impl Module for Sequencer {
     fn draw(&mut self, _font: &sdl2::ttf::Font, interact: Option<ModuleInteractInfo>)
         -> Option<sdl2::surface::Surface<'_>> {
 
-        const SCALE_LEN: u16 = 12;
-
         use sdl2::{
             surface::Surface,
             pixels::{Color, PixelFormatEnum},
@@ -72,6 +70,7 @@ impl Module for Sequencer {
             rect::Rect,
         };
 
+        const SCALE_LEN: u16 = 12;
         let (width, height) = (400, 200);
 
         let mut canvas =
