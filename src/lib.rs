@@ -4,6 +4,8 @@ pub use utils::*;
 mod modules;
 pub use modules::*;
 
+pub mod ui_utils;
+
 use std::sync::atomic::*;
 
 pub static SAMPLE_RATE: AtomicU32 = AtomicU32::new(0);
@@ -40,7 +42,7 @@ pub struct ModuleInteractInfo<'a> {
     pub x: u16,
     pub y: u16,
     pub click: Option<sdl2::mouse::MouseButton>,
-    pub events: &'a sdl2::EventPump,
+    pub event_pump: &'a sdl2::EventPump,
 }
 
 pub trait Module {
