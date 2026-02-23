@@ -14,6 +14,7 @@ pub struct Sequencer {
     step: usize,
     next_step: SystemTime,
     step_duration: Duration,
+    scale_size: u16,
 }
 
 impl Sequencer {
@@ -25,6 +26,7 @@ impl Sequencer {
             step: 0,
             next_step: SystemTime::UNIX_EPOCH,
             step_duration: Duration::from_secs_f32(60.0 / BPM / 4.0),
+            scale_size: 13,
         }
     }
 }
@@ -70,7 +72,6 @@ impl Module for Sequencer {
             rect::Rect,
         };
 
-        const SCALE_LEN: u16 = 12;
         let (width, height) = (400, 200);
 
         let mut canvas =
@@ -78,11 +79,11 @@ impl Module for Sequencer {
             .unwrap().into_canvas().unwrap();
 
         let note_width = width / self.sequence.len() as u32;
-        let note_height = height / SCALE_LEN as u32;
+        let note_height = height / self.scale_size as u32;
         canvas.set_draw_color(Color::RGB(0, 0, 200));
         for (i, notes) in self.sequence.iter().enumerate() {
             for note in notes {
-                let note = SCALE_LEN as i32 - 1 - *note as i32;
+                let note = self.scale_size as i32 - 1 - *note as i32;
                 canvas.fill_rect(Rect::new(
                     note_width as i32 * i as i32,
                     note_height as i32 * note,
@@ -94,7 +95,7 @@ impl Module for Sequencer {
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         for x in 0..self.sequence.len() {
-            for y in 0..SCALE_LEN {
+            for y in 0..self.scale_size {
                 canvas.draw_rect(Rect::new(
                     note_width as i32 * x as i32,
                     note_height as i32 * y as i32,
@@ -108,9 +109,9 @@ impl Module for Sequencer {
             if let Some(btn) = info.click {
                 if btn == MouseButton::Left {
                     let i = (info.x as u32 / note_width) as usize;
-                    let note = (SCALE_LEN as u8 - 1).checked_sub((info.y as u32 / note_height) as u8);
+                    let note = (self.scale_size as u8 - 1).checked_sub((info.y as u32 / note_height) as u8);
                     if let Some(note) = note {
-                        if (note as u16) < SCALE_LEN {
+                        if (note as u16) < self.scale_size {
                             if let Some(index) = self.sequence[i].iter()
                                     .position(|a| *a == note) {
                                 self.sequence[i].remove(index);
