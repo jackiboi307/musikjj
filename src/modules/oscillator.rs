@@ -56,10 +56,6 @@ impl Oscillator {
     fn calculate_saw(&self, index: f32) -> f32 {
         index
     }
-
-    // fn calculate_tan(&self, index: f32) -> f32 {
-    //     f32::max(-1.0, f32::min(1.0, (index * TAU).tan()))
-    // }
 }
 
 impl Module for Oscillator {
