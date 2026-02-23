@@ -175,12 +175,18 @@ impl Gui {
         'running: loop {
             let mut clicked_mouse_btn = None;
 
+            // handle events, window selection and connecting modules
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. } => break 'running,
                     Event::MouseButtonDown { x, y, mouse_btn, .. } => {
                         clicked_mouse_btn = Some(mouse_btn);
                         selection = self.check_selected(x, y);
+
+                        let mut app = app.lock().unwrap();
+                        app.set_selection(selection.clone().map(|_| self.selected));
+
+                        // put the selected window in the front
 
                         let mut index = None;
                         for (i, id) in self.modules.iter()
@@ -194,13 +200,11 @@ impl Gui {
                             let old = self.modules.remove(index);
                             self.modules.push(old);
                         }
-
-                        let mut app = app.lock().unwrap();
-                        app.set_selection(selection.clone().map(|_| self.selected));
                     }
                     Event::MouseButtonUp { x, y, .. } => {
                         let mut app = app.lock().unwrap();
                         let new_selection = self.check_selected(x, y);
+
                         match new_selection {
                             Some(Selection::Output(out_id)) => {
                                 match selection {
@@ -231,6 +235,11 @@ impl Gui {
             canvas.set_draw_color(COLOR_BG);
             canvas.clear();
 
+            // this is very ugly but it has its reasons
+            let mut pending_conn_line: Option<((i32, i32), (i32, i32))> = None;
+
+            // check if the current selection is valid, update window dimensions,
+            // update pending_line
             match selection {
                 Some(Selection::Window(module_id, start_rect, mx, my)) => {
                     if !keyboard.is_scancode_pressed(Scancode::LCtrl) {
@@ -258,8 +267,7 @@ impl Gui {
                 Some(Selection::Output(mod_id)) => {
                     if mouse.left() {
                         let output_conn = self.module(mod_id).output_conn();
-                        canvas.set_draw_color(COLOR_CONN);
-                        canvas.draw_line(output_conn, (mouse.x(), mouse.y())).unwrap();
+                        pending_conn_line = Some((output_conn, (mouse.x(), mouse.y())));
                     } else {
                         selection = None;
                     }
@@ -267,8 +275,7 @@ impl Gui {
                 Some(Selection::Input(mod_id, conn_id)) => {
                     if mouse.left() {
                         let input_conn = self.module(mod_id).input_conns()[conn_id];
-                        canvas.set_draw_color(COLOR_CONN);
-                        canvas.draw_line(input_conn, (mouse.x(), mouse.y())).unwrap();
+                        pending_conn_line = Some((input_conn, (mouse.x(), mouse.y())));
                     } else {
                         selection = None;
                     }
@@ -276,7 +283,10 @@ impl Gui {
                 _ => {}
             }
 
+            // draw windows / modules
             for (id, module_win) in self.modules.iter_mut() {
+                // draw the window
+
                 let (width, height) = module_win.padded_size();
 
                 let mut mod_canvas =
@@ -305,15 +315,19 @@ impl Gui {
                 let texture = surface.as_texture(&texture_creator).unwrap();
                 canvas.copy(&texture, surface.rect(), module_win.padded_rect()).unwrap();
 
+                // draw input connections
                 for input in module_win.input_conns() {
                     canvas.filled_circle(input.0 as i16, input.1 as i16, 5, COLOR_CONN).unwrap();
                 }
 
                 if *id != 0 {
+                    // draw output connections
                     let output = module_win.output_conn();
                     canvas.filled_circle(output.0 as i16, output.1 as i16, 5, COLOR_CONN).unwrap();
 
                     let mut app = app.lock().unwrap();
+
+                    // do Module::draw
 
                     let interact = if self.selected == *id && selection.is_none() {
                         let x = mouse.x() - module_win.x - WIN_PADDING as i32;
@@ -347,6 +361,13 @@ impl Gui {
                 }
             }
 
+            // draw pending connection
+            if let Some((start, end)) = pending_conn_line {
+                canvas.set_draw_color(COLOR_CONN);
+                canvas.draw_line(start, end).unwrap();
+            }
+
+            // draw present connections
             {
                 let app = app.lock().unwrap();
 
