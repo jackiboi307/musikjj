@@ -1,3 +1,6 @@
+mod context;
+pub use context::UiContext;
+
 use sdl2::rect::Rect;
 
 pub struct SimpleLayoutBuilder {

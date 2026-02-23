@@ -60,7 +60,7 @@ impl Module for Sequencer {
         inputs: [],
     }
 
-    fn draw(&mut self, _font: &sdl2::ttf::Font, interact: Option<ModuleInteractInfo>)
+    fn draw(&mut self, _ui: &UiContext<'_>, interact: Option<ModuleInteractInfo>)
         -> Option<sdl2::surface::Surface<'_>> {
 
         use sdl2::{

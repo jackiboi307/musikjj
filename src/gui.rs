@@ -1,4 +1,5 @@
 use crate::*;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -10,6 +11,8 @@ use sdl2::{
     surface::Surface,
     gfx::primitives::DrawRenderer,
 };
+
+// TODO move these constants into ui_utils::UiContext
 
 const COLOR_BG: Color = Color::RGB(150, 180, 190);
 const COLOR_WIN_BG: Color = Color::RGB(200, 200, 200);
@@ -152,6 +155,9 @@ impl Gui {
         let ttf_context = sdl2::ttf::init().unwrap();
 
         let font = ttf_context.load_font("assets/FreeMono.otf", 16).unwrap();
+        let ui_context = UiContext {
+            font,
+        };
 
         let mut output_win = ModuleWindow::new("Output");
         output_win.inputs = vec![(DataType::Audio, "")];
@@ -280,7 +286,7 @@ impl Gui {
                 mod_canvas.set_draw_color(COLOR_WIN_BG);
                 mod_canvas.clear();
 
-                let rendered_title = font.render(module_win.title).solid(COLOR_TEXT).unwrap();
+                let rendered_title = ui_context.font.render(module_win.title).solid(COLOR_TEXT).unwrap();
                 rendered_title.blit(rendered_title.rect(), mod_canvas.surface_mut(), Rect::new(
                     ((width / 2).saturating_sub(rendered_title.width() / 2)) as i32,
                     0,
@@ -326,7 +332,7 @@ impl Gui {
                         } else { None }
                     } else { None };
 
-                    if let Some(surface) = app.module(*id).draw(&font, interact) {
+                    if let Some(surface) = app.module(*id).draw(&ui_context, interact) {
                         let texture = surface.as_texture(&texture_creator).unwrap();
                         canvas.copy(
                             &texture,

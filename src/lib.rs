@@ -5,6 +5,7 @@ mod modules;
 pub use modules::*;
 
 pub mod ui_utils;
+pub use ui_utils::UiContext;
 
 use std::sync::atomic::*;
 
@@ -52,7 +53,7 @@ pub trait Module {
     fn tick(&mut self) -> Option<Data>;
     fn send(&mut self, _input: usize, _data: Data) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any;
-    fn draw(&mut self, _font: &sdl2::ttf::Font, _interact: Option<ModuleInteractInfo>)
+    fn draw(&mut self, _ui: &UiContext<'_>, _interact: Option<ModuleInteractInfo>)
         -> Option<sdl2::surface::Surface<'_>> { None }
     fn execute(&self, _cmd: String) {
         println!("Module::execute is not implemented for: {}", self.title());

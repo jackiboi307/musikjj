@@ -2,7 +2,8 @@ use crate::*;
 use std::f32::consts::TAU;
 
 #[allow(dead_code)]
-enum Waveshape {
+#[derive(Clone, Copy)]
+pub enum Waveshape {
     Sine,
     Square,
     Saw,
@@ -10,14 +11,14 @@ enum Waveshape {
 
 pub struct Oscillator {
     pub waveform: Box<[f32]>,
-    waveshape: Waveshape,
+    pub waveshape: Waveshape,
     index: usize,
 }
 
 impl Oscillator {
-    pub fn new() -> Self {
+    pub fn new(waveshape: Waveshape) -> Self {
         Self {
-            waveshape: Waveshape::Square,
+            waveshape,
             waveform: vec![].into(),
             index: 0,
         }
@@ -79,5 +80,16 @@ impl Module for Oscillator {
 
     fn send(&mut self, _input: usize, data: Data) {
         self.set_waveform(data.notes()[0].freq());
+    }
+}
+
+
+impl Waveshape {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Sine => "sine",
+            Self::Square => "square",
+            Self::Saw => "saw",
+        }
     }
 }
