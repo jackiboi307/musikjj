@@ -71,11 +71,14 @@ impl ModuleWindow {
     }
 
     fn output_conn(&self) -> (i32, i32) {
-        (self.x + self.padded_size().0 as i32, self.y + 20)
+        (self.x + self.padded_size().0 as i32, self.y + self.height as i32 / 2)
     }
 
     fn input_conns(&self) -> Vec<(i32, i32)> {
-        (0..self.inputs.len()).map(|i| (self.x, self.y + 20 + 20 * i as i32)).collect()
+        const SPACING: i32 = 20;
+        let len = self.inputs.len() as i32;
+        let y = self.y + self.height as i32 / 2 - SPACING * len / 2;
+        (0..len).map(|i| (self.x, y + SPACING + SPACING * i as i32)).collect()
     }
 }
 
