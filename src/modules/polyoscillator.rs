@@ -1,5 +1,4 @@
 use crate::*;
-use super::oscillator::Waveshape;
 
 pub struct PolyOscillator {
     oscillators: Vec<(Oscillator, bool)>,
@@ -12,10 +11,14 @@ impl PolyOscillator {
         }
     }
 
-    pub fn set_oscillators(&mut self, amount: usize) {
+    fn add_oscillator(&mut self, waveshape: Waveshape) {
+        self.oscillators.push((Oscillator::new(waveshape), false));
+    }
+
+    pub fn set_oscillators(&mut self, waveshape: Waveshape, amount: usize) {
         self.oscillators.clear();
         for _ in 0..amount {
-            self.oscillators.push((Oscillator::new(Waveshape::Sine), false));
+            self.add_oscillator(waveshape);
         }
     }
 
@@ -83,7 +86,7 @@ impl Module for PolyOscillator {
             pixels::PixelFormatEnum,
         };
 
-        let (width, height) = (200, 200);
+        let (width, height) = (250, 200);
 
         let mut canvas =
             Surface::new(width, height, PixelFormatEnum::RGBA32)
@@ -92,8 +95,21 @@ impl Module for PolyOscillator {
         let mouse_pos = interact.as_ref().and_then(|info| Some((info.x, info.y)));
         let mut layout = crate::ui_utils::SimpleLayoutBuilder::new((0, 0), mouse_pos);
 
-        if ui.add_button(&mut canvas, &mut layout, interact, self.current_waveshape().as_str(), Some(6)) {
+        ui.add_label(&mut canvas, &mut layout, self.current_waveshape().as_str(), Some(6));
+        if ui.add_button(&mut canvas, &mut layout, &interact, "cycle waveshape", None) {
             self.cycle_waveshape();
+        }
+
+        layout.next_row();
+
+        ui.add_label(&mut canvas, &mut layout, &*format!("oscs: {}", self.oscillators.len()), Some(8));
+        if ui.add_button(&mut canvas, &mut layout, &interact, "+", None) {
+            self.add_oscillator(self.current_waveshape());
+        }
+        if ui.add_button(&mut canvas, &mut layout, &interact, "-", None) {
+            if 1 < self.oscillators.len() {
+                self.oscillators.pop();
+            }
         }
 
         Some(canvas.into_surface())

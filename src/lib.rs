@@ -98,4 +98,12 @@ impl Note {
             Self::Freq(freq) => freq,
         }
     }
+
+    pub fn transpose(self, amount: i16) -> Self {
+        match self {
+            // TODO fix this math
+            Self::Midi(note) => Self::Midi((note as i16 + amount) as u8),
+            Self::Freq(freq) => Self::Freq(freq + amount.signum() as f32 * midi_to_freq(amount.abs() as u8)),
+        }
+    }
 }

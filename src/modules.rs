@@ -1,5 +1,5 @@
 mod oscillator;
-pub use oscillator::Oscillator;
+pub use oscillator::{Oscillator, Waveshape};
 
 mod polyoscillator;
 pub use polyoscillator::PolyOscillator;
@@ -12,3 +12,6 @@ pub use sequencer::Sequencer;
 
 mod mixer;
 pub use mixer::Mixer;
+
+mod transpose;
+pub use transpose::Transpose;

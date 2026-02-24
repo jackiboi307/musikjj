@@ -12,28 +12,56 @@ pub struct UiContext<'a> {
 }
 
 impl UiContext<'_> {
+    pub fn add_label(
+            &self,
+            canvas: &mut SurfaceCanvas,
+            layout: &mut super::SimpleLayoutBuilder,
+            text: &str,
+            width: Option<u32>) {
+
+        let width = if let Some(width) = width {
+            width
+        } else {
+            text.chars().count() as u32
+        };
+
+        let text = self.font.render(text).solid(Color::BLACK).unwrap();
+        let char_size = self.font.size_of_char('m').unwrap();
+        let rect = Rect::new(
+            0,
+            0,
+            char_size.0 * width,
+            char_size.1
+        );
+        let (_, rect) = layout.add_rect(rect);
+
+        text.blit(text.rect(), canvas.surface_mut(), rect).unwrap();
+    }
+
     pub fn add_button(
             &self,
             canvas: &mut SurfaceCanvas,
             layout: &mut super::SimpleLayoutBuilder,
-            interact: Option<ModuleInteractInfo>,
+            interact: &Option<ModuleInteractInfo>,
             text: &str,
             width: Option<u32>) -> bool {
 
-        let mut text = self.font.render(text).solid(Color::WHITE).unwrap();
-        let (rect, shift) = if let Some(width) = width {
-            let char_size = self.font.size_of_char('m').unwrap();
-            let rect = Rect::new(
-                0,
-                0,
-                char_size.0 * width,
-                char_size.1
-            );
-            (rect, ((rect.width() - text.rect().width()) / 2) as i32)
+        const MARGIN: u8 = 5;
+
+        let width = if let Some(width) = width {
+            width
         } else {
-            (text.rect(), 0)
+            text.chars().count() as u32
         };
 
+        let mut text = self.font.render(text).solid(Color::WHITE).unwrap();
+        let char_size = self.font.size_of_char('m').unwrap();
+        let rect = Rect::new(
+            0,
+            0,
+            char_size.0 * width + MARGIN as u32 * 2,
+            char_size.1
+        );
         let (hovered, rect) = layout.add_rect(rect);
 
         let (pressed, clicked) = if let Some(info) = interact {
@@ -50,16 +78,16 @@ impl UiContext<'_> {
 
         let color = if hovered {
             if pressed {
-                Color::WHITE
+                Color::RGB(140, 140, 140)
             } else {
-                Color::GRAY
+                Color::RGB(90, 90, 90)
             }
         } else {
             Color::BLACK
         };
 
         text.set_color_mod(color);
-        text.blit(rect.left_shifted(shift), canvas.surface_mut(), rect).unwrap();
+        text.blit(text.rect(), canvas.surface_mut(), rect.right_shifted(MARGIN.into())).unwrap();
         canvas.set_draw_color(color);
         canvas.draw_rect(rect).unwrap();
         hovered && clicked

@@ -84,11 +84,12 @@ impl App {
 
     fn init(&mut self) {
         let mut osc = PolyOscillator::new();
-        osc.set_oscillators(3);
+        osc.set_oscillators(Waveshape::Sine, 3);
 
         self.insert_module(Box::new(osc));
         self.insert_module(Box::new(Sequencer::new()));
         self.insert_module(Box::new(Adsr::new()));
+        self.insert_module(Box::new(Transpose::new()));
     }
 
     fn module(&mut self, module: ModuleId) -> &mut Box<dyn Module + Send> {
