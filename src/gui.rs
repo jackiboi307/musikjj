@@ -71,14 +71,16 @@ impl ModuleWindow {
     }
 
     fn output_conn(&self) -> (i32, i32) {
-        (self.x + self.padded_size().0 as i32, self.y + self.height as i32 / 2)
+        let (_, height) = self.padded_size();
+        (self.x + self.padded_size().0 as i32, self.y + height as i32 / 2)
     }
 
     fn input_conns(&self) -> Vec<(i32, i32)> {
         const SPACING: i32 = 20;
+        let (_, height) = self.padded_size();
         let len = self.inputs.len() as i32;
-        let y = self.y + self.height as i32 / 2 - SPACING * len / 2;
-        (0..len).map(|i| (self.x, y + SPACING + SPACING * i as i32)).collect()
+        let y = self.y + height as i32 / 2 - SPACING * len / 2;
+        (0..len).map(|i| (self.x, y + SPACING * i as i32)).collect()
     }
 }
 
@@ -302,7 +304,7 @@ impl Gui {
                 let rendered_title = ui_context.font.render(module_win.title).solid(COLOR_TEXT).unwrap();
                 rendered_title.blit(rendered_title.rect(), mod_canvas.surface_mut(), Rect::new(
                     ((width / 2).saturating_sub(rendered_title.width() / 2)) as i32,
-                    0,
+                    WIN_PADDING_TOP as i32 / 2,
                     width,
                     rendered_title.height()
                 )).unwrap();
