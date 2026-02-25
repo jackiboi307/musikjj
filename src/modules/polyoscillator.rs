@@ -86,7 +86,7 @@ impl Module for PolyOscillator {
             pixels::PixelFormatEnum,
         };
 
-        let (width, height) = (250, 200);
+        let (width, height) = (250, 50);
 
         let mut canvas =
             Surface::new(width, height, PixelFormatEnum::RGBA32)
