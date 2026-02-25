@@ -260,9 +260,10 @@ impl Gui {
                             module.x = start_rect.x() + dx;
                             module.y = start_rect.y() + dy;
 
-                        } else if mouse.right() {
-                            module.width  = i32::max(50, start_rect.width()  as i32 + dx) as u32;
-                            module.height = i32::max(50, start_rect.height() as i32 + dy) as u32;
+                        // TODO either remove this, or fix it so that it doesn't stretch windows
+                        // } else if mouse.right() {
+                            // module.width  = i32::max(50, start_rect.width()  as i32 + dx) as u32;
+                            // module.height = i32::max(50, start_rect.height() as i32 + dy) as u32;
 
                         } else {
                             selection = None;
