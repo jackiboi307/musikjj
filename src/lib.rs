@@ -8,6 +8,7 @@ pub mod ui_utils;
 pub use ui_utils::UiContext;
 
 use std::sync::atomic::*;
+use std::collections::HashMap;
 
 pub static SAMPLE_RATE: AtomicU32 = AtomicU32::new(0);
 
@@ -46,6 +47,8 @@ pub struct ModuleInteractInfo<'a> {
     pub event_pump: &'a sdl2::EventPump,
 }
 
+type SerializeableData = HashMap<String, serde_json::Value>;
+
 pub trait Module {
     fn title(&self) -> &'static str;
     fn get_output_type(&self) -> DataType;
@@ -58,6 +61,8 @@ pub trait Module {
     fn execute(&self, _cmd: String) {
         println!("Module::execute is not implemented for: {}", self.title());
     }
+    fn get_data(&self) -> SerializeableData { todo!() }
+    fn load_data(&self, _data: SerializeableData) { todo!() }
 }
 
 #[macro_export]
@@ -79,14 +84,14 @@ impl Data {
     fn audio(self) -> f32 {
         match self {
             Self::Audio(value) => value,
-            _ => panic!()
+            _ => 0.0
         }
     }
 
     fn notes(self) -> Box<[Note]> {
         match self {
             Self::Notes(notes) => notes,
-            _ => panic!()
+            _ => Box::new([])
         }
     }
 }
