@@ -79,7 +79,7 @@ impl ModuleWindow {
         const SPACING: i32 = 20;
         let (_, height) = self.padded_size();
         let len = self.inputs.len() as i32;
-        let y = self.y + height as i32 / 2 - SPACING * len / 2;
+        let y = self.y + height as i32 / 2 - SPACING * (len / 2);
         (0..len).map(|i| (self.x, y + SPACING * i as i32)).collect()
     }
 }
