@@ -15,3 +15,27 @@ pub use mixer::Mixer;
 
 mod transpose;
 pub use transpose::Transpose;
+
+use crate::*;
+
+macro_rules! define_module_from_id {
+    ($($module:ident,)*) => {
+        pub fn module_from_id(id: &str) -> Option<Box<dyn Module + Send>> {
+            $(
+                let module = $module::new();
+                if id == module.id() {
+                    return Some(Box::new(module))
+                }
+            )*
+            None
+        }
+    }
+}
+
+define_module_from_id! {
+    PolyOscillator,
+    Adsr,
+    Sequencer,
+    Mixer,
+    Transpose,
+}

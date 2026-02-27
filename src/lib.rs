@@ -51,6 +51,7 @@ type SerializeableData = HashMap<String, serde_json::Value>;
 
 pub trait Module {
     fn title(&self) -> &'static str;
+    fn id(&self) -> &'static str;
     fn get_output_type(&self) -> DataType;
     fn get_inputs(&self) -> Vec<(DataType, &'static str)>;
     fn tick(&mut self) -> Option<Data>;
@@ -61,18 +62,20 @@ pub trait Module {
     fn execute(&self, _cmd: String) {
         println!("Module::execute is not implemented for: {}", self.title());
     }
-    fn get_data(&self) -> SerializeableData { todo!() }
-    fn load_data(&self, _data: SerializeableData) { todo!() }
+    fn get_data(&self) -> SerializeableData { HashMap::new() }
+    fn load_data(&self, _data: SerializeableData) {}
 }
 
 #[macro_export]
 macro_rules! define_module {
     (
         $(title: $title:expr,)?
+        $(id: $id:expr,)?
         $(output: $output_type:ident,)?
         $(inputs: [$(($input_type:ident, $input_label:expr)$(,)?)*],)?
     ) => {
         $(fn title(&self) -> &'static str { $title })?
+        $(fn id(&self) -> &'static str { $id })?
         $(fn get_output_type(&self) -> DataType { DataType::$output_type })?
         $(fn get_inputs(&self) -> Vec<(DataType, &'static str)>
             { vec![$((DataType::$input_type, $input_label),)*] })?

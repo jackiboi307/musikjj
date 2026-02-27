@@ -70,6 +70,7 @@ impl Module for Oscillator {
 
     define_module! {
         title: "Oscillator",
+        id: "oscillator",
         output: Audio,
         inputs: [(Notes, "note")],
     }

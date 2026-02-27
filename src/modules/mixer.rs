@@ -6,10 +6,10 @@ pub struct Mixer {
 }
 
 impl Mixer {
-    pub fn new(input_count: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             values: Vec::new(),
-            input_count,
+            input_count: 0,
         }
     }
 }
@@ -23,6 +23,7 @@ impl Module for Mixer {
 
     define_module! {
         title: "Mixer",
+        id: "mixer",
         output: Audio,
     }
 

@@ -25,12 +25,12 @@ const DEFAULT_WIN_SIZE: u32 = 160;
 const WIN_PADDING: u8 = 20;
 const WIN_PADDING_TOP: u8 = 10; // extra top padding
 
-struct ModuleWindow {
+pub struct ModuleWindow {
     // TODO change to i16?
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
     title: &'static str,
     inputs: Vec<(DataType, &'static str)>,
 }
@@ -104,13 +104,21 @@ impl Gui {
         }
     }
 
-    fn module(&mut self, id: ModuleId) -> &mut ModuleWindow {
+    pub fn module(&self, id: ModuleId) -> &ModuleWindow {
+        for (iter_id, module) in self.modules.iter() {
+            if id == *iter_id {
+                return module
+            }
+        }
+        panic!()
+    }
+
+    pub fn module_mut(&mut self, id: ModuleId) -> &mut ModuleWindow {
         for (iter_id, module) in self.modules.iter_mut() {
             if id == *iter_id {
                 return module
             }
         }
-
         panic!()
     }
 
@@ -143,6 +151,10 @@ impl Gui {
         None
     }
 
+    pub fn insert_module(&mut self, id: ModuleId, module: &Box<dyn Module + Send>) {
+        self.modules.push((id, ModuleWindow::new(module.title())));
+    }
+
     pub fn run(&mut self, app: Arc<Mutex<App>>) {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
@@ -167,13 +179,6 @@ impl Gui {
         let mut output_win = ModuleWindow::new("Output");
         output_win.inputs = vec![(DataType::Audio, "")];
         self.modules.push((0, output_win));
-
-        {
-            let app = app.lock().unwrap();
-            for (id, module) in app.modules.iter() {
-                self.modules.push((*id, ModuleWindow::new(module.title())));
-            }
-        }
 
         let mut selection = None;
 
@@ -251,7 +256,7 @@ impl Gui {
                         selection = None;
 
                     } else {
-                        let module = self.module(module_id);
+                        let module = self.module_mut(module_id);
 
                         let dx = mouse.x().saturating_sub(mx);
                         let dy = mouse.y().saturating_sub(my);
@@ -379,7 +384,7 @@ impl Gui {
 
                 // TODO update this less often
                 for (i, module) in app.modules.iter() {
-                    self.module(*i).inputs =
+                    self.module_mut(*i).inputs =
                         module.get_inputs().iter().map(|i| (i.0.clone(), i.1.into())).collect();
                 }
 

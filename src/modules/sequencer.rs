@@ -58,6 +58,7 @@ impl Module for Sequencer {
 
     define_module! {
         title: "Sequencer",
+        id: "sequencer",
         output: Notes,
         inputs: [],
     }

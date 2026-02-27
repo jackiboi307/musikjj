@@ -15,24 +15,67 @@ use std::{
     collections::HashMap,
 };
 
+use serde::{Serialize, Deserialize};
+use serde_json::Value;
+
 const ERASE_LINE: &'static str = "\x1b[2K";
 const CUR_COL_HOME: &'static str = "\x1b[0G";
 
 fn main() -> anyhow::Result<()> {
-    let app = Arc::new(Mutex::new(App::new()));
+    const FILENAME: &'static str = "saved.json";
+    let (app, mut gui) = load_file(FILENAME);
 
     let stream = stream_setup_for(Arc::clone(&app))?;
-    println!("Playing...");
+    println!("playing...");
     stream.play()?;
 
     let app_clone = Arc::clone(&app);
     std::thread::spawn(move || read_loop(app_clone));
 
-    let mut gui = Gui::new();
     gui.run(Arc::clone(&app));
 
-    println!();
+    {
+        let app = app.lock().unwrap();
+        app.save_to_file("saved.json", &gui);
+        println!("\nsaved to {FILENAME}");
+    }
+
     Ok(())
+}
+
+fn load_file(filename: &str) -> (Arc<Mutex<App>>, Gui) {
+    fn load_file(filename: &str) -> anyhow::Result<(Arc<Mutex<App>>, Gui)> {
+        let project: PackedProject = serde_json::from_str(str::from_utf8(&std::fs::read(filename)?)?)?;
+        let mut app = App::new();
+        let mut gui = Gui::new();
+        // TODO create some App::from_project method, that loads a PackedProject by basically doing
+        // the below stuff
+        // TODO also, call it Savefile or something instead of Project
+        app.conns = project.conns.iter().map(|item| *item).collect();
+        for (id, module) in project.modules.iter() {
+            let id = *id;
+            app.modules.insert(id, module_from_id(&module.id).unwrap());
+            gui.insert_module(id, app.module(id));
+            let win: &mut gui::ModuleWindow = gui.module_mut(id);
+            win.x = module.x;
+            win.y = module.y;
+        }
+        Ok((Arc::new(Mutex::new(app)), gui))
+    }
+
+    match load_file(filename) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("error while loading file: {error}");
+            let mut app = App::new();
+            let mut gui = Gui::new();
+            app.init();
+            for (id, module) in app.modules.iter() {
+                gui.insert_module(*id, module);
+            }
+            (Arc::new(Mutex::new(app)), gui)
+        }
+    }
 }
 
 fn flush() {
@@ -71,6 +114,20 @@ struct App {
     selection: Option<ModuleId>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct PackedModule {
+    id: Box<str>,
+    x: i32,
+    y: i32,
+    data: HashMap<String, Value>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PackedProject {
+    modules: Vec<(ModuleId, PackedModule)>,
+    conns: Vec<((ModuleId, usize), ModuleId)>,
+}
+
 impl App {
     fn new() -> Self {
         Self {
@@ -80,6 +137,24 @@ impl App {
             next_id: 1,
             selection: None,
         }
+    }
+
+    fn save_to_file(&self, filename: &str, gui: &Gui) {
+        let mut modules = Vec::new();
+        for (id, module) in self.modules.iter() {
+            let win = gui.module(*id);
+            modules.push((*id, PackedModule {
+                id: module.id().into(),
+                data: module.get_data(),
+                x: win.x,
+                y: win.y,
+            }));
+        }
+        let project = PackedProject {
+            modules,
+            conns: self.conns.clone().iter().map(|(k, v)| (*k, *v)).collect(),
+        };
+        std::fs::write(filename, serde_json::to_string(&project).unwrap()).unwrap()
     }
 
     fn init(&mut self) {
@@ -121,7 +196,7 @@ impl App {
 
             if self.selection != selection {
                 print!(
-                    "{ERASE_LINE}{CUR_COL_HOME}Selected module: {} (id: {})\n>>> ",
+                    "{ERASE_LINE}{CUR_COL_HOME}selected module: {} (id: {})\n>>> ",
                     self.module(id).title(), id
                 );
                 flush();
@@ -213,18 +288,18 @@ fn host_device_setup()
     // default to id 6 (pulseaudio)
     // let device = devices[6].clone();
 
-    println!("Devices:");
+    println!("devices:");
     for (i, device) in devices.iter().enumerate() {
         println!("\t{i}: {}: {}", device.id()?, device.description()?);
     }
 
-    let input = read_line("Select device > ")?;
+    let input = read_line("select device > ")?;
     let device: cpal::Device = devices[input.trim_end().parse::<usize>().unwrap()].clone();
 
-    println!("Output device: {}", device.id()?);
+    println!("output device: {}", device.id()?);
 
     let config = device.default_output_config()?;
-    println!("Default output config: {config:#?}");
+    println!("default output config: {config:#?}");
 
     Ok((host, device, config))
 }
@@ -239,13 +314,8 @@ fn make_stream<T>(
     let num_channels = config.channels as usize;
     set_sample_rate(config.sample_rate);
 
-    {
-        let mut app = app.lock().unwrap();
-        app.init();
-    }
-
     let err_fn = |err| eprintln!(
-        "Error building output sound stream: {err}");
+        "error building output sound stream: {err}");
 
     let stream = device.build_output_stream(
         config,

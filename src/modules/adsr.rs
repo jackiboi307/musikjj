@@ -24,6 +24,7 @@ impl Module for Adsr {
 
     define_module! {
         title: "Adsr",
+        id: "adsr",
         output: Audio,
         inputs: [(Audio, "audio"), (Notes, "gate")],
     }

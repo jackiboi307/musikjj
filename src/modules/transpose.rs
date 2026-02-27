@@ -38,6 +38,7 @@ impl Module for Transpose {
 
     define_module! {
         title: "Transpose",
+        id: "transpose",
         output: Notes,
         inputs: [(Notes, "notes")],
     }

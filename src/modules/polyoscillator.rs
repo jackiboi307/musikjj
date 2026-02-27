@@ -35,7 +35,11 @@ impl PolyOscillator {
 
     fn current_waveshape(&self) -> Waveshape {
         // assume the same waveshape is used for all oscillators
-        self.oscillators[0].0.waveshape
+        if let Some((osc, _)) = self.oscillators.get(0) {
+            osc.waveshape
+        } else {
+            Waveshape::Sine
+        }
     }
 
     fn cycle_waveshape(&mut self) {
@@ -70,6 +74,7 @@ impl Module for PolyOscillator {
 
     define_module! {
         title: "PolyOscillator",
+        id: "polyoscillator",
         output: Audio,
         inputs: [(Notes, "notes")],
     }

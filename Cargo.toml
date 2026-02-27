@@ -7,12 +7,15 @@ edition = "2024"
 anyhow = "1.0.101"
 clap = "4.5.57"
 cpal = "0.17.1"
-serde = "1.0.228"
 serde_json = "1.0.149"
 
 [dependencies.sdl2]
 version = "0.38.0"
 features = ["ttf", "gfx"]
+
+[dependencies.serde]
+version = "1.0.228"
+features = ["derive"]
 
 # [dependencies.termabc]
 # version = "0.1.0"
