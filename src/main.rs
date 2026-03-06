@@ -45,20 +45,22 @@ fn main() -> anyhow::Result<()> {
 
 fn load_file(filename: &str) -> (Arc<Mutex<App>>, Gui) {
     fn load_file(filename: &str) -> anyhow::Result<(Arc<Mutex<App>>, Gui)> {
-        let project: PackedProject = serde_json::from_str(str::from_utf8(&std::fs::read(filename)?)?)?;
+        let project: SavedProject = serde_json::from_str(str::from_utf8(&std::fs::read(filename)?)?)?;
         let mut app = App::new();
         let mut gui = Gui::new();
-        // TODO create some App::from_project method, that loads a PackedProject by basically doing
-        // the below stuff
-        // TODO also, call it Savefile or something instead of Project
+        gui.init();
         app.conns = project.conns.iter().map(|item| *item).collect();
         for (id, module) in project.modules.iter() {
             let id = *id;
             app.modules.insert(id, module_from_id(&module.id).unwrap());
-            gui.insert_module(id, app.module(id));
-            let win: &mut gui::ModuleWindow = gui.module_mut(id);
-            win.x = module.x;
-            win.y = module.y;
+        }
+        for (id, x, y) in project.windows.iter() {
+            if *id != 0 {
+                gui.insert_module(*id, app.module(*id));
+            }
+            let win: &mut gui::ModuleWindow = gui.module_mut(*id);
+            win.x = *x;
+            win.y = *y;
         }
         Ok((Arc::new(Mutex::new(app)), gui))
     }
@@ -70,6 +72,7 @@ fn load_file(filename: &str) -> (Arc<Mutex<App>>, Gui) {
             let mut app = App::new();
             let mut gui = Gui::new();
             app.init();
+            gui.init();
             for (id, module) in app.modules.iter() {
                 gui.insert_module(*id, module);
             }
@@ -115,16 +118,15 @@ struct App {
 }
 
 #[derive(Serialize, Deserialize)]
-struct PackedModule {
+struct SavedModule {
     id: Box<str>,
-    x: i32,
-    y: i32,
     data: HashMap<String, Value>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct PackedProject {
-    modules: Vec<(ModuleId, PackedModule)>,
+struct SavedProject {
+    modules: Vec<(ModuleId, SavedModule)>,
+    windows: Vec<(ModuleId, i32, i32)>,
     conns: Vec<((ModuleId, usize), ModuleId)>,
 }
 
@@ -141,17 +143,19 @@ impl App {
 
     fn save_to_file(&self, filename: &str, gui: &Gui) {
         let mut modules = Vec::new();
+        let mut windows = Vec::new();
         for (id, module) in self.modules.iter() {
-            let win = gui.module(*id);
-            modules.push((*id, PackedModule {
+            modules.push((*id, SavedModule {
                 id: module.id().into(),
                 data: module.get_data(),
-                x: win.x,
-                y: win.y,
             }));
         }
-        let project = PackedProject {
+        for (id, win) in &gui.modules {
+            windows.push((*id, win.x, win.y));
+        }
+        let project = SavedProject {
             modules,
+            windows,
             conns: self.conns.clone().iter().map(|(k, v)| (*k, *v)).collect(),
         };
         std::fs::write(filename, serde_json::to_string(&project).unwrap()).unwrap()

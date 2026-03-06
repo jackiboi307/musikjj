@@ -85,7 +85,7 @@ impl ModuleWindow {
 }
 
 pub struct Gui {
-    modules: Vec<(ModuleId, ModuleWindow)>,
+    pub modules: Vec<(ModuleId, ModuleWindow)>,
     selected: ModuleId,
 }
 
@@ -155,6 +155,12 @@ impl Gui {
         self.modules.push((id, ModuleWindow::new(module.title())));
     }
 
+    pub fn init(&mut self) {
+        let mut output_win = ModuleWindow::new("Output");
+        output_win.inputs = vec![(DataType::Audio, "")];
+        self.modules.push((0, output_win));
+    }
+
     pub fn run(&mut self, app: Arc<Mutex<App>>) {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
@@ -175,10 +181,6 @@ impl Gui {
         let ui_context = UiContext {
             font,
         };
-
-        let mut output_win = ModuleWindow::new("Output");
-        output_win.inputs = vec![(DataType::Audio, "")];
-        self.modules.push((0, output_win));
 
         let mut selection = None;
 
