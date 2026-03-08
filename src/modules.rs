@@ -27,7 +27,7 @@ macro_rules! define_module_from_id {
                     return Some(Box::new(module))
                 }
             )*
-            None
+            todo!()
         }
     }
 }

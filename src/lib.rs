@@ -7,8 +7,8 @@ pub use modules::*;
 pub mod ui_utils;
 pub use ui_utils::UiContext;
 
+use serde::{Serialize, Deserialize};
 use std::sync::atomic::*;
-use std::collections::HashMap;
 
 pub static SAMPLE_RATE: AtomicU32 = AtomicU32::new(0);
 
@@ -22,19 +22,19 @@ pub fn get_sample_rate() -> u32 {
 
 pub const BPM: f32 = 180.0;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DataType {
     Audio,
     Notes,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Data {
     Audio(f32),
     Notes(Box<[Note]>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Note {
     Midi(u8),
     Freq(f32),
@@ -46,8 +46,6 @@ pub struct ModuleInteractInfo<'a> {
     pub click: Option<sdl2::mouse::MouseButton>,
     pub event_pump: &'a sdl2::EventPump,
 }
-
-type SerializeableData = HashMap<String, serde_json::Value>;
 
 pub trait Module {
     fn title(&self) -> &'static str;
@@ -62,8 +60,8 @@ pub trait Module {
     fn execute(&self, _cmd: String) {
         println!("Module::execute is not implemented for: {}", self.title());
     }
-    fn get_data(&self) -> SerializeableData { HashMap::new() }
-    fn load_data(&self, _data: SerializeableData) {}
+    fn get_data(&self) -> Vec<u8> { Vec::new() }
+    fn load_data(&self, _data: Vec<u8>) {}
 }
 
 #[macro_export]

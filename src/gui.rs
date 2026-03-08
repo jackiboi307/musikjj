@@ -3,6 +3,8 @@ use crate::*;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use serde::{Serialize, Deserialize};
+
 use sdl2::{
     event::Event,
     keyboard::Scancode,
@@ -25,14 +27,15 @@ const DEFAULT_WIN_SIZE: u32 = 160;
 const WIN_PADDING: u8 = 20;
 const WIN_PADDING_TOP: u8 = 10; // extra top padding
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ModuleWindow {
     // TODO change to i16?
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
-    title: &'static str,
-    inputs: Vec<(DataType, &'static str)>,
+    title: Box<str>,
+    inputs: Vec<(DataType, Box<str>)>,
 }
 
 impl ModuleWindow {
@@ -42,7 +45,7 @@ impl ModuleWindow {
             y: 50,
             width: DEFAULT_WIN_SIZE,
             height: DEFAULT_WIN_SIZE,
-            title,
+            title: title.into(),
             inputs: Vec::new(),
         }
     }
@@ -84,6 +87,7 @@ impl ModuleWindow {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Gui {
     pub modules: Vec<(ModuleId, ModuleWindow)>,
     selected: ModuleId,
@@ -157,7 +161,7 @@ impl Gui {
 
     pub fn init(&mut self) {
         let mut output_win = ModuleWindow::new("Output");
-        output_win.inputs = vec![(DataType::Audio, "")];
+        output_win.inputs = vec![(DataType::Audio, "".into())];
         self.modules.push((0, output_win));
     }
 
@@ -309,7 +313,7 @@ impl Gui {
                 mod_canvas.set_draw_color(COLOR_WIN_BG);
                 mod_canvas.clear();
 
-                let rendered_title = ui_context.font.render(module_win.title).solid(COLOR_TEXT).unwrap();
+                let rendered_title = ui_context.font.render(&module_win.title).solid(COLOR_TEXT).unwrap();
                 rendered_title.blit(rendered_title.rect(), mod_canvas.surface_mut(), Rect::new(
                     ((width / 2).saturating_sub(rendered_title.width() / 2)) as i32,
                     WIN_PADDING_TOP as i32 / 2,

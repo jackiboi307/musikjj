@@ -1,5 +1,8 @@
-mod gui;
+pub(self) mod gui;
 use gui::Gui;
+
+mod savefile;
+use savefile::*;
 
 use musikjj::*;
 
@@ -15,11 +18,12 @@ use std::{
     collections::HashMap,
 };
 
-use serde::{Serialize, Deserialize};
-use serde_json::Value;
+pub use serde::{Serialize, Deserialize};
 
 const ERASE_LINE: &'static str = "\x1b[2K";
 const CUR_COL_HOME: &'static str = "\x1b[0G";
+
+pub type ModuleId = u16;
 
 fn main() -> anyhow::Result<()> {
     const FILENAME: &'static str = "saved.json";
@@ -36,49 +40,12 @@ fn main() -> anyhow::Result<()> {
 
     {
         let app = app.lock().unwrap();
-        app.save_to_file("saved.json", &gui);
+        let modules = app.get_serializeable_modules();
+        save_file("saved.json", app.clone(), modules, gui);
         println!("\nsaved to {FILENAME}");
     }
 
     Ok(())
-}
-
-fn load_file(filename: &str) -> (Arc<Mutex<App>>, Gui) {
-    fn load_file(filename: &str) -> anyhow::Result<(Arc<Mutex<App>>, Gui)> {
-        let project: SavedProject = serde_json::from_str(str::from_utf8(&std::fs::read(filename)?)?)?;
-        let mut app = App::new();
-        let mut gui = Gui::new();
-        gui.init();
-        app.conns = project.conns.iter().map(|item| *item).collect();
-        for (id, module) in project.modules.iter() {
-            let id = *id;
-            app.modules.insert(id, module_from_id(&module.id).unwrap());
-        }
-        for (id, x, y) in project.windows.iter() {
-            if *id != 0 {
-                gui.insert_module(*id, app.module(*id));
-            }
-            let win: &mut gui::ModuleWindow = gui.module_mut(*id);
-            win.x = *x;
-            win.y = *y;
-        }
-        Ok((Arc::new(Mutex::new(app)), gui))
-    }
-
-    match load_file(filename) {
-        Ok(result) => result,
-        Err(error) => {
-            eprintln!("error while loading file: {error}");
-            let mut app = App::new();
-            let mut gui = Gui::new();
-            app.init();
-            gui.init();
-            for (id, module) in app.modules.iter() {
-                gui.insert_module(*id, module);
-            }
-            (Arc::new(Mutex::new(app)), gui)
-        }
-    }
 }
 
 fn flush() {
@@ -107,27 +74,16 @@ fn read_loop(app: Arc<Mutex<App>>) {
     }
 }
 
-type ModuleId = u16;
+pub type SerializeableModules = HashMap<ModuleId, (String, Vec<u8>)>;
 
+#[derive(Serialize, Deserialize)]
 struct App {
+    #[serde(skip)]
     modules: HashMap<ModuleId, Box<dyn Module + Send>>,
     conns: HashMap<(ModuleId, usize), ModuleId>,
     cached: HashMap<ModuleId, Option<Data>>,
     next_id: ModuleId,
     selection: Option<ModuleId>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct SavedModule {
-    id: Box<str>,
-    data: HashMap<String, Value>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct SavedProject {
-    modules: Vec<(ModuleId, SavedModule)>,
-    windows: Vec<(ModuleId, i32, i32)>,
-    conns: Vec<((ModuleId, usize), ModuleId)>,
 }
 
 impl App {
@@ -141,24 +97,10 @@ impl App {
         }
     }
 
-    fn save_to_file(&self, filename: &str, gui: &Gui) {
-        let mut modules = Vec::new();
-        let mut windows = Vec::new();
-        for (id, module) in self.modules.iter() {
-            modules.push((*id, SavedModule {
-                id: module.id().into(),
-                data: module.get_data(),
-            }));
-        }
-        for (id, win) in &gui.modules {
-            windows.push((*id, win.x, win.y));
-        }
-        let project = SavedProject {
-            modules,
-            windows,
-            conns: self.conns.clone().iter().map(|(k, v)| (*k, *v)).collect(),
-        };
-        std::fs::write(filename, serde_json::to_string(&project).unwrap()).unwrap()
+    fn get_serializeable_modules(&self) -> SerializeableModules {
+        self.modules.iter()
+            .map(|(id, module)| (*id, (module.id().to_string(), module.get_data())))
+            .collect()
     }
 
     fn init(&mut self) {
@@ -256,6 +198,18 @@ impl App {
         match self.get_output(0) {
             Some(Data::Audio(audio)) => audio,
             _ => 0.0
+        }
+    }
+}
+
+impl Clone for App {
+    fn clone(&self) -> Self {
+        Self {
+            modules: HashMap::new(),
+            conns: self.conns.clone(),
+            cached: self.cached.clone(),
+            next_id: self.next_id.clone(),
+            selection: self.selection.clone(),
         }
     }
 }
