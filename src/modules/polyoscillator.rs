@@ -1,5 +1,6 @@
 use crate::*;
 
+#[derive(Serialize, Deserialize)]
 pub struct PolyOscillator {
     oscillators: Vec<(Oscillator, bool)>,
 }
@@ -78,6 +79,8 @@ impl Module for PolyOscillator {
         output: Audio,
         inputs: [(Notes, "notes")],
     }
+
+    impl_serialization!();
 
     fn send(&mut self, _input: usize, data: Data) {
         self.set_freqs(data.notes().iter().map(|note| note.freq()).collect())

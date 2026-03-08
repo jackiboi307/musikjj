@@ -10,6 +10,7 @@ macro_rules! add_btn {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Transpose {
     amount: i16,
     notes: Box<[Note]>,
@@ -42,6 +43,8 @@ impl Module for Transpose {
         output: Notes,
         inputs: [(Notes, "notes")],
     }
+
+    impl_serialization!();
 
     fn send(&mut self, _input: usize, data: Data) {
         self.notes = data.notes();

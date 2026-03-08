@@ -1,14 +1,7 @@
 use crate::*;
 use std::time::{SystemTime, Duration};
 
-macro_rules! sequence {
-    ($($note:expr $(,)?)*) => {
-        vec![$(
-            vec![$note],
-        )*]
-    }
-}
-
+#[derive(Serialize, Deserialize)]
 pub struct Sequencer {
     pub sequence: Vec<Vec<u8>>,
     step: usize,
@@ -19,10 +12,8 @@ pub struct Sequencer {
 
 impl Sequencer {
     pub fn new() -> Self {
-        let sequence = sequence![0, 4, 7, 9, 6, 1, 8, 2];
-
         Self {
-            sequence,
+            sequence: (0..8).map(|_| Vec::new()).collect(),
             step: 0,
             next_step: SystemTime::UNIX_EPOCH,
             step_duration: Duration::from_secs_f32(60.0 / BPM / 4.0),
@@ -62,6 +53,8 @@ impl Module for Sequencer {
         output: Notes,
         inputs: [],
     }
+
+    impl_serialization!();
 
     fn draw(&mut self, _ui: &UiContext<'_>, interact: Option<ModuleInteractInfo>)
         -> Option<sdl2::surface::Surface<'_>> {

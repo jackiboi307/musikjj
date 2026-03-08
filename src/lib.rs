@@ -61,7 +61,7 @@ pub trait Module {
         println!("Module::execute is not implemented for: {}", self.title());
     }
     fn get_data(&self) -> Vec<u8> { Vec::new() }
-    fn load_data(&self, _data: Vec<u8>) {}
+    fn load_data(&mut self, _data: Vec<u8>) {}
 }
 
 #[macro_export]
@@ -112,4 +112,34 @@ impl Note {
             Self::Freq(freq) => Self::Freq(freq + amount.signum() as f32 * midi_to_freq(amount.abs() as u8)),
         }
     }
+}
+
+#[macro_export]
+macro_rules! impl_serialization {
+    () => {
+        fn get_data(&self) -> Vec<u8> {
+            serialize(self).unwrap()
+        }
+
+        fn load_data(&mut self, data: Vec<u8>) {
+            match deserialize(data) {
+                Ok(value) => { *self = value }
+                Err(err) => eprintln!("deserializing '{}' failed: {}", self.id(), err)
+            }
+        }
+    }
+}
+
+pub fn serialize(data: impl Serialize) -> Result<Vec<u8>, Box<bincode::ErrorKind>> {
+    let mut buffer: Vec<u8> = Vec::new();
+    let options = bincode::options();
+    let mut serializer = bincode::Serializer::new(&mut buffer, options);
+    data.serialize(&mut serializer)?;
+    Ok(buffer)
+}
+
+pub fn deserialize<T: for<'a> Deserialize<'a>>(data: Vec<u8>) -> Result<T, Box<bincode::ErrorKind>> {
+    let options = bincode::options();
+    let mut deserializer = bincode::Deserializer::from_slice(&data, options);
+    T::deserialize(&mut deserializer)
 }

@@ -2,13 +2,14 @@ use crate::*;
 use std::f32::consts::TAU;
 
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum Waveshape {
     Sine,
     Square,
     Saw,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Oscillator {
     pub waveform: Box<[f32]>,
     pub waveshape: Waveshape,
