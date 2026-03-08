@@ -26,7 +26,7 @@ const CUR_COL_HOME: &'static str = "\x1b[0G";
 pub type ModuleId = u16;
 
 fn main() -> anyhow::Result<()> {
-    const FILENAME: &'static str = "saved.json";
+    const FILENAME: &'static str = "saved.musikjj";
     let (app, mut gui) = load_file(FILENAME);
 
     let stream = stream_setup_for(Arc::clone(&app))?;
@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     {
         let app = app.lock().unwrap();
         let modules = app.get_serializeable_modules();
-        save_file("saved.json", app.clone(), modules, gui);
+        save_file(FILENAME, app.clone(), modules, gui);
         println!("\nsaved to {FILENAME}");
     }
 
