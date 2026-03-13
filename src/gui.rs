@@ -91,11 +91,13 @@ impl ModuleWindow {
 pub struct Gui {
     pub modules: Vec<(ModuleId, ModuleWindow)>,
     selected: ModuleId,
+    x: i32,
+    y: i32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Selection {
-    Window(ModuleId, Rect, i32, i32),
+    Window(ModuleId),
     Output(ModuleId),
     Input(ModuleId, usize),
 }
@@ -105,6 +107,8 @@ impl Gui {
         Self {
             modules: Vec::new(),
             selected: 0,
+            x: 0,
+            y: 0,
         }
     }
 
@@ -130,6 +134,9 @@ impl Gui {
         // selection box size
         const SEL: i32 = 20;
 
+        let x = x - self.x;
+        let y = y - self.y;
+
         for (id, module) in self.modules.iter().rev() {
             let id = *id;
             let (cx, cy) = module.output_conn();
@@ -148,7 +155,7 @@ impl Gui {
 
             if module.padded_rect().contains_point((x, y)) {
                 self.selected = id;
-                return Some(Selection::Window(id.clone(), module.rect(), x, y));
+                return Some(Selection::Window(id.clone()));
             }
         }
 
@@ -247,55 +254,46 @@ impl Gui {
 
             let keyboard = event_pump.keyboard_state();
             let mouse = event_pump.mouse_state();
+            let delta_mouse = event_pump.relative_mouse_state();
+
+            let (dx, dy) = (delta_mouse.x(), delta_mouse.y());
+            let lctrl = keyboard.is_scancode_pressed(Scancode::LCtrl);
+
+            if lctrl && mouse.middle() {
+                self.x += dx;
+                self.y += dy;
+            }
+
+            if selection.is_some() && mouse.left() {
+                if let Some(Selection::Window(id)) = selection {
+                    if lctrl {
+                        let module = self.module_mut(id);
+                        module.x += dx;
+                        module.y += dy;
+                    } else {
+                        selection = None;
+                    }
+                }
+            } else {
+                selection = None;
+            }
 
             canvas.set_draw_color(COLOR_BG);
             canvas.clear();
 
-            // this is very ugly but it has its reasons
+            // TODO see if this can be removed
             let mut pending_conn_line: Option<((i32, i32), (i32, i32))> = None;
 
-            // check if the current selection is valid, update window dimensions,
-            // update pending_line
             match selection {
-                Some(Selection::Window(module_id, start_rect, mx, my)) => {
-                    if !keyboard.is_scancode_pressed(Scancode::LCtrl) {
-                        selection = None;
-
-                    } else {
-                        let module = self.module_mut(module_id);
-
-                        let dx = mouse.x().saturating_sub(mx);
-                        let dy = mouse.y().saturating_sub(my);
-
-                        if mouse.left() {
-                            module.x = start_rect.x() + dx;
-                            module.y = start_rect.y() + dy;
-
-                        // TODO either remove this, or fix it so that it doesn't stretch windows
-                        // } else if mouse.right() {
-                            // module.width  = i32::max(50, start_rect.width()  as i32 + dx) as u32;
-                            // module.height = i32::max(50, start_rect.height() as i32 + dy) as u32;
-
-                        } else {
-                            selection = None;
-                        }
-                    }
-                }
                 Some(Selection::Output(mod_id)) => {
-                    if mouse.left() {
-                        let output_conn = self.module(mod_id).output_conn();
-                        pending_conn_line = Some((output_conn, (mouse.x(), mouse.y())));
-                    } else {
-                        selection = None;
-                    }
+                    let output_conn = self.module(mod_id).output_conn();
+                    let output_conn = (output_conn.0 + self.x, output_conn.1 + self.y);
+                    pending_conn_line = Some((output_conn, (mouse.x(), mouse.y())));
                 }
                 Some(Selection::Input(mod_id, conn_id)) => {
-                    if mouse.left() {
-                        let input_conn = self.module(mod_id).input_conns()[conn_id];
-                        pending_conn_line = Some((input_conn, (mouse.x(), mouse.y())));
-                    } else {
-                        selection = None;
-                    }
+                    let input_conn = self.module(mod_id).input_conns()[conn_id];
+                    let input_conn = (input_conn.0 + self.x, input_conn.1 + self.y);
+                    pending_conn_line = Some((input_conn, (mouse.x(), mouse.y())));
                 }
                 _ => {}
             }
@@ -330,25 +328,35 @@ impl Gui {
 
                 let surface = mod_canvas.into_surface();
                 let texture = surface.as_texture(&texture_creator).unwrap();
-                canvas.copy(&texture, surface.rect(), module_win.padded_rect()).unwrap();
+                canvas.copy(&texture, surface.rect(),
+                    module_win.padded_rect().right_shifted(self.x).bottom_shifted(self.y)
+                ).unwrap();
 
                 // draw input connections
                 for input in module_win.input_conns() {
-                    canvas.filled_circle(input.0 as i16, input.1 as i16, 5, COLOR_CONN).unwrap();
+                    canvas.filled_circle(
+                        (input.0 + self.x) as i16,
+                        (input.1 + self.y) as i16,
+                        5, COLOR_CONN
+                    ).unwrap();
                 }
 
                 if *id != 0 {
                     // draw output connections
                     let output = module_win.output_conn();
-                    canvas.filled_circle(output.0 as i16, output.1 as i16, 5, COLOR_CONN).unwrap();
+                    canvas.filled_circle(
+                        (output.0 + self.x) as i16,
+                        (output.1 + self.y) as i16,
+                        5, COLOR_CONN
+                    ).unwrap();
 
                     let mut app = app.lock().unwrap();
 
                     // do Module::draw
 
                     let interact = if self.selected == *id && selection.is_none() {
-                        let x = mouse.x() - module_win.x - WIN_PADDING as i32;
-                        let y = mouse.y() - module_win.y - WIN_PADDING as i32 - WIN_PADDING_TOP as i32;
+                        let x = mouse.x() - self.x - module_win.x - WIN_PADDING as i32;
+                        let y = mouse.y() - self.y - module_win.y - WIN_PADDING as i32 - WIN_PADDING_TOP as i32;
 
                         if 0 <= x && x < module_win.width as i32
                             && 0 <= y && y < module_win.height as i32 {
@@ -369,8 +377,8 @@ impl Gui {
                             &texture,
                             surface.rect(),
                             module_win.rect()
-                                .right_shifted(WIN_PADDING as i32)
-                                .bottom_shifted(WIN_PADDING as i32 + WIN_PADDING_TOP as i32)
+                                .right_shifted(WIN_PADDING as i32 + self.x)
+                                .bottom_shifted(WIN_PADDING as i32 + WIN_PADDING_TOP as i32 + self.y)
                         ).unwrap();
                         module_win.width = surface.rect().width();
                         module_win.height = surface.rect().height();
@@ -397,7 +405,12 @@ impl Gui {
                 canvas.set_draw_color(COLOR_CONN);
                 for ((input_id, conn_id), output_id) in &app.conns {
                     let inputs = self.module(*input_id).input_conns();
-                    canvas.draw_line(inputs[*conn_id], self.module(*output_id).output_conn()).unwrap();
+                    let input = inputs[*conn_id];
+                    let output = self.module(*output_id).output_conn();
+                    canvas.draw_line(
+                        (input.0 + self.x, input.1 + self.y),
+                        (output.0 + self.x, output.1 + self.y)
+                    ).unwrap();
                 }
             }
 
