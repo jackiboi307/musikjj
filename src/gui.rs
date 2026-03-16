@@ -8,6 +8,7 @@ use serde::{Serialize, Deserialize};
 use sdl2::{
     event::Event,
     keyboard::Scancode,
+    mouse::MouseButton,
     pixels::{Color, PixelFormatEnum},
     rect::Rect,
     surface::Surface,
@@ -142,13 +143,13 @@ impl Gui {
             let (cx, cy) = module.output_conn();
 
             if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
-                self.selected = id;
+                // self.selected = id;
                 return Some(Selection::Output(id));
             }
 
             for (conn_id, (cx, cy)) in module.input_conns().iter().enumerate() {
                 if cx - SEL < x && x < cx + SEL && cy - SEL < y && y < cy + SEL {
-                    self.selected = id;
+                    // self.selected = id;
                     return Some(Selection::Input(id, conn_id));
                 }
             }
@@ -197,67 +198,70 @@ impl Gui {
 
         'running: loop {
             let mut clicked_mouse_btn = None;
+            let keyboard = event_pump.keyboard_state();
+            let lctrl = keyboard.is_scancode_pressed(Scancode::LCtrl);
 
             // handle events, window selection and connecting modules
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. } => break 'running,
                     Event::MouseButtonDown { x, y, mouse_btn, .. } => {
-                        clicked_mouse_btn = Some(mouse_btn);
-                        selection = self.check_selected(x, y);
+                        if !(mouse_btn == MouseButton::Middle && lctrl) {
+                            clicked_mouse_btn = Some(mouse_btn);
+                            selection = self.check_selected(x, y);
 
-                        let mut app = app.lock().unwrap();
-                        app.set_selection(selection.clone().map(|_| self.selected));
+                            let mut app = app.lock().unwrap();
+                            app.set_selection(selection.clone().map(|_| self.selected));
 
-                        // put the selected window in the front
+                            // put the selected window in the front
 
-                        let mut index = None;
-                        for (i, id) in self.modules.iter()
-                                .enumerate().map(|(i, (id, _))| (i, id)) {
-                            if *id == self.selected {
-                                index = Some(i);
+                            let mut index = None;
+                            for (i, id) in self.modules.iter()
+                                    .enumerate().map(|(i, (id, _))| (i, id)) {
+                                if *id == self.selected {
+                                    index = Some(i);
+                                }
                             }
-                        }
 
-                        if let Some(index) = index {
-                            let old = self.modules.remove(index);
-                            self.modules.push(old);
+                            if let Some(index) = index {
+                                let old = self.modules.remove(index);
+                                self.modules.push(old);
+                            }
                         }
                     }
-                    Event::MouseButtonUp { x, y, .. } => {
-                        let mut app = app.lock().unwrap();
-                        let new_selection = self.check_selected(x, y);
+                    Event::MouseButtonUp { x, y, mouse_btn, .. } => {
+                        if !(mouse_btn == MouseButton::Middle && lctrl) {
+                            let mut app = app.lock().unwrap();
+                            let new_selection = self.check_selected(x, y);
 
-                        match new_selection {
-                            Some(Selection::Output(out_id)) => {
-                                match selection {
-                                    Some(Selection::Input(in_id, conn_id)) => {
-                                        app.connect(out_id, (in_id, conn_id));
+                            match new_selection {
+                                Some(Selection::Output(out_id)) => {
+                                    match selection {
+                                        Some(Selection::Input(in_id, conn_id)) => {
+                                            app.connect(out_id, (in_id, conn_id));
+                                        }
+                                        _ => {}
                                     }
-                                    _ => {}
                                 }
-                            }
-                            Some(Selection::Input(in_id, conn_id)) => {
-                                match selection {
-                                    Some(Selection::Output(out_id)) => {
-                                        app.connect(out_id, (in_id, conn_id));
+                                Some(Selection::Input(in_id, conn_id)) => {
+                                    match selection {
+                                        Some(Selection::Output(out_id)) => {
+                                            app.connect(out_id, (in_id, conn_id));
+                                        }
+                                        _ => {}
                                     }
-                                    _ => {}
                                 }
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
                     _ => {}
                 }
             }
 
-            let keyboard = event_pump.keyboard_state();
             let mouse = event_pump.mouse_state();
             let delta_mouse = event_pump.relative_mouse_state();
-
             let (dx, dy) = (delta_mouse.x(), delta_mouse.y());
-            let lctrl = keyboard.is_scancode_pressed(Scancode::LCtrl);
 
             if lctrl && mouse.middle() {
                 self.x += dx;
